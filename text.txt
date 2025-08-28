@@ -1,0 +1,6 @@
+so now you have the git repo on your machine locally. if you look in the bottom left, you can see which branch you are on
+
+so, we can each have our own branch.
+when we save our code, it saves to the specific branch. We never want to save to main unless we are absolutely sure we want to push those updates.
+
+So, you work in your branch and it doesnt have to worry about overwritting each others code.
