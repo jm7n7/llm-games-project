@@ -1,0 +1,21 @@
+#--- STREAMLIT THEME CONFIGURATION ---
+# This file defines the color theme for the Streamlit app.
+# To use this, create a folder named ".streamlit" in your project's root directory
+# and save this file as "config.toml" inside it.
+
+[theme]
+#--- UMKC COLORS ---
+# Main (UMKC Blue) - Used for sidebar background
+#"#004B87"
+
+# Secondary (UMKC Gold) - Used for interactive elements
+primaryColor = "#FFC72C"
+
+# Alternate (Alternate Blue) - Can be used if needed, but primaryColor is the main accent
+backgroundColor = "#407EC9"
+
+# Light - Used for the main app background
+secondaryBackgroundColor = "#F0F2F6"
+
+# Dark - Used for text
+textColor = "#262730"
