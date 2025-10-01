@@ -1,31 +1,30 @@
-#--- imports----------
+# --- imports ----------
 import streamlit as st
 import chess
-import chess.pgn
 import chess.svg
 import numpy as np
 import random
 import string
-from chess_export import convert_pgn_to_csv
 import chess.pgn
+from chess_export import convert_pgn_to_csv   # your helper file
 
-#--- PAGE CONFIG --
+# --- PAGE CONFIG --
 st.set_page_config(
     page_title="Game Arcade",
     layout="wide"
 )
 
-#--- APP TITLE AND HEADER------
+# --- APP TITLE AND HEADER ------
 st.title("Game Arcade")
 
-#--- SIDEBAR FOR GAME SELECTION-------------
+# --- SIDEBAR FOR GAME SELECTION -------------
 st.sidebar.header("Choose a Game")
 game_selection = st.sidebar.radio(
     "Select a game to play:",
     ("Home", "Chess", "Four-in-a-row", "Letter-Tile-Game", "Mancala")
 )
 
-#--- MAIN CONTENT AREA ----------------------------------------------------
+# ==================== HOME ====================
 if game_selection == "Home":
     st.header("Welcome to the Game Arcade!")
     st.info("Select a game from the sidebar on the left to start playing.")
@@ -34,20 +33,50 @@ if game_selection == "Home":
     Enjoy your stay!
     """)
 
+# ==================== CHESS ====================
 elif game_selection == "Chess":
     st.header("Chess")
 
-    # === Initialize Chess State ===
+    # --- Helper functions ---
+    def render_chessboard(board, orientation=chess.WHITE):
+        """Render chessboard as inline SVG inside Streamlit (no cairosvg)."""
+        svg_code = chess.svg.board(board, orientation=orientation, size=250)
+        st.markdown(f"<div style='text-align:center'>{svg_code}</div>", unsafe_allow_html=True)
+
+
+    def reset_chess():
+        """Reset game state for a fresh game."""
+        st.session_state.chess_game_phase = "color_selection"
+        st.session_state.board.reset()
+        st.session_state.pop("chess_exported", None)
+        st.rerun()
+
+    def show_game_status(board):
+        """Display current game status."""
+        if board.is_checkmate():
+            st.success(f"Checkmate! Winner is {'White' if board.turn == chess.BLACK else 'Black'}.")
+        elif board.is_stalemate():
+            st.warning("Stalemate!")
+        elif board.is_insufficient_material():
+            st.info("Draw by insufficient material.")
+        elif board.is_seventyfive_moves():
+            st.info("Draw by 75-move rule.")
+        elif board.is_fivefold_repetition():
+            st.info("Draw by fivefold repetition.")
+        else:
+            turn = "White" if board.turn == chess.WHITE else "Black"
+            st.write(f"It's **{turn}'s** turn to move.")
+
+    # === Initialize session state ===
     if "chess_game_phase" not in st.session_state:
         st.session_state.chess_game_phase = "color_selection"
         st.session_state.board = chess.Board()
         st.session_state.player_color = chess.WHITE
 
-    # Initialize dataset if not present
     if "chess_dataset" not in st.session_state:
         st.session_state.chess_dataset = []
 
-    # --- COLOR SELECTION PHASE ---
+    # --- COLOR SELECTION ---
     if st.session_state.chess_game_phase == "color_selection":
         st.subheader("Choose Your Color")
         col1, col2 = st.columns(2)
@@ -56,116 +85,63 @@ elif game_selection == "Chess":
                 st.session_state.player_color = chess.WHITE
                 st.session_state.chess_game_phase = "playing"
                 st.session_state.board.reset()
-                if "chess_exported" in st.session_state:
-                    del st.session_state.chess_exported
                 st.rerun()
         with col2:
             if st.button("Play as Black", use_container_width=True):
                 st.session_state.player_color = chess.BLACK
                 st.session_state.chess_game_phase = "playing"
                 st.session_state.board.reset()
-                if "chess_exported" in st.session_state:
-                    del st.session_state.chess_exported
                 st.rerun()
 
-    # --- GAME END LOGIC ---
+    # --- GAME END ---
     if st.session_state.board.is_game_over():
-        if st.session_state.board.is_checkmate():
-            st.success(
-                f"Checkmate! Winner is {'White' if st.session_state.board.turn == chess.BLACK else 'Black'}."
-            )
-        elif st.session_state.board.is_stalemate():
-            st.warning("Stalemate!")
-        elif st.session_state.board.is_insufficient_material():
-            st.info("Draw by insufficient material.")
-        elif st.session_state.board.is_seventyfive_moves():
-            st.info("Draw by 75-move rule.")
-        elif st.session_state.board.is_fivefold_repetition():
-            st.info("Draw by fivefold repetition.")
-        else:
-            st.info("Game over.")
+        show_game_status(st.session_state.board)
 
-        # Export PGN to dataset + CSV (only once per game)
+        # Export PGN once per game
         if "chess_exported" not in st.session_state:
             pgn = chess.pgn.Game.from_board(st.session_state.board)
             st.session_state.chess_dataset.append(str(pgn))
 
-            # Convert ALL games so far into CSV
+            # Append all games to CSV
             all_pgns = "\n\n".join(st.session_state.chess_dataset)
             convert_pgn_to_csv(all_pgns, "Custom_Chess_Dataset.csv", start_game=1)
 
             st.session_state.chess_exported = True
-            st.info(
-                "Game automatically added to dataset and exported to Custom_Chess_Dataset.csv"
-            )
+            st.info("Game added to dataset and exported to Custom_Chess_Dataset.csv")
 
-        # Browser Download Button
+        # Download dataset
         if st.session_state.chess_dataset:
             with open("Custom_Chess_Dataset.csv", "rb") as f:
                 st.download_button(
-                    label="Download Chess Dataset CSV",
-                    data=f,
-                    file_name="Custom_Chess_Dataset.csv",
-                    mime="text/csv",
+                    "Download Chess Dataset CSV", f, "Custom_Chess_Dataset.csv", "text/csv"
                 )
 
-        # New Game Button
+        # Start new game
         if st.button("New Game"):
-            st.session_state.chess_game_phase = "color_selection"
-            st.session_state.board.reset()
-            if "chess_exported" in st.session_state:
-                del st.session_state.chess_exported
-            st.rerun()
+            reset_chess()
 
+    # --- PLAYING ---
+    elif st.session_state.chess_game_phase == "playing":
+        render_chessboard(st.session_state.board, orientation=st.session_state.player_color)
 
-
-
-    # --- PLAYING PHASE ---
-    elif st.session_state.chess_game_phase == 'playing':
-        # Display the current board state as an SVG image, oriented to the player's color.
-        board_svg = chess.svg.board(st.session_state.board, orientation=st.session_state.player_color)
-        st.image(board_svg)
-
-        # Get legal moves for the current player
-        legal_moves = list(st.session_state.board.legal_moves)
-
-        # Check if the game is over to avoid showing the move selection
         if not st.session_state.board.is_game_over():
-            # Convert moves to Standard Algebraic Notation (SAN) for the dropdown
+            legal_moves = list(st.session_state.board.legal_moves)
             san_moves = [st.session_state.board.san(move) for move in legal_moves]
 
             with st.form("move_form", clear_on_submit=True):
-                selected_san_move = st.selectbox("Choose your move:", options=san_moves)
+                selected_san_move = st.selectbox("Choose your move:", san_moves)
                 submitted = st.form_submit_button("Make Move")
 
             if submitted and selected_san_move:
-                # Find the original move object from the selected SAN string
                 move_to_make = legal_moves[san_moves.index(selected_san_move)]
                 st.session_state.board.push(move_to_make)
                 st.rerun()
 
-        # Display game status
-        st.subheader("Game Status")
-        if st.session_state.board.is_checkmate():
-            st.success(f"Checkmate! Winner is {'White' if st.session_state.board.turn == chess.BLACK else 'Black'}.")
-        elif st.session_state.board.is_stalemate():
-            st.warning("Stalemate!")
-        elif st.session_state.board.is_insufficient_material():
-            st.info("Draw by insufficient material.")
-        elif st.session_state.board.is_seventyfive_moves():
-            st.info("Draw by 75-move rule.")
-        elif st.session_state.board.is_fivefold_repetition():
-            st.info("Draw by fivefold repetition.")
-        else:
-            turn = "White" if st.session_state.board.turn == chess.WHITE else "Black"
-            st.write(f"It's **{turn}'s** turn to move.")
+        show_game_status(st.session_state.board)
 
-        # Add a button to reset the game
         if st.button("New Game"):
-            st.session_state.chess_game_phase = 'color_selection'
-            st.rerun()
+            reset_chess()
 
-        # Display the move history in PGN format
         st.subheader("Move History (PGN)")
         pgn = chess.pgn.Game.from_board(st.session_state.board)
         st.text_area("PGN", str(pgn), height=150)
