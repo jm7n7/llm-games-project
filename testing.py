@@ -6,8 +6,6 @@ import chess.svg
 import numpy as np
 import random
 import string
-from chess_export import convert_pgn_to_csv
-import chess.pgn
 
 #--- PAGE CONFIG --
 st.set_page_config(
@@ -37,88 +35,28 @@ if game_selection == "Home":
 elif game_selection == "Chess":
     st.header("Chess")
 
-    # === Initialize Chess State ===
-    if "chess_game_phase" not in st.session_state:
-        st.session_state.chess_game_phase = "color_selection"
+    # Initialize chess game state if it doesn't exist
+    if 'chess_game_phase' not in st.session_state:
+        st.session_state.chess_game_phase = 'color_selection'
         st.session_state.board = chess.Board()
         st.session_state.player_color = chess.WHITE
 
-    # Initialize dataset if not present
-    if "chess_dataset" not in st.session_state:
-        st.session_state.chess_dataset = []
-
     # --- COLOR SELECTION PHASE ---
-    if st.session_state.chess_game_phase == "color_selection":
+    if st.session_state.chess_game_phase == 'color_selection':
         st.subheader("Choose Your Color")
         col1, col2 = st.columns(2)
         with col1:
             if st.button("Play as White", use_container_width=True):
                 st.session_state.player_color = chess.WHITE
-                st.session_state.chess_game_phase = "playing"
-                st.session_state.board.reset()
-                if "chess_exported" in st.session_state:
-                    del st.session_state.chess_exported
+                st.session_state.chess_game_phase = 'playing'
+                st.session_state.board.reset() # Reset board to start
                 st.rerun()
         with col2:
             if st.button("Play as Black", use_container_width=True):
                 st.session_state.player_color = chess.BLACK
-                st.session_state.chess_game_phase = "playing"
-                st.session_state.board.reset()
-                if "chess_exported" in st.session_state:
-                    del st.session_state.chess_exported
+                st.session_state.chess_game_phase = 'playing'
+                st.session_state.board.reset() # Reset board to start
                 st.rerun()
-
-    # --- GAME END LOGIC ---
-    if st.session_state.board.is_game_over():
-        if st.session_state.board.is_checkmate():
-            st.success(
-                f"Checkmate! Winner is {'White' if st.session_state.board.turn == chess.BLACK else 'Black'}."
-            )
-        elif st.session_state.board.is_stalemate():
-            st.warning("Stalemate!")
-        elif st.session_state.board.is_insufficient_material():
-            st.info("Draw by insufficient material.")
-        elif st.session_state.board.is_seventyfive_moves():
-            st.info("Draw by 75-move rule.")
-        elif st.session_state.board.is_fivefold_repetition():
-            st.info("Draw by fivefold repetition.")
-        else:
-            st.info("Game over.")
-
-        # Export PGN to dataset + CSV (only once per game)
-        if "chess_exported" not in st.session_state:
-            pgn = chess.pgn.Game.from_board(st.session_state.board)
-            st.session_state.chess_dataset.append(str(pgn))
-
-            # Convert ALL games so far into CSV
-            all_pgns = "\n\n".join(st.session_state.chess_dataset)
-            convert_pgn_to_csv(all_pgns, "Custom_Chess_Dataset.csv", start_game=1)
-
-            st.session_state.chess_exported = True
-            st.info(
-                "Game automatically added to dataset and exported to Custom_Chess_Dataset.csv"
-            )
-
-        # Browser Download Button
-        if st.session_state.chess_dataset:
-            with open("Custom_Chess_Dataset.csv", "rb") as f:
-                st.download_button(
-                    label="Download Chess Dataset CSV",
-                    data=f,
-                    file_name="Custom_Chess_Dataset.csv",
-                    mime="text/csv",
-                )
-
-        # New Game Button
-        if st.button("New Game"):
-            st.session_state.chess_game_phase = "color_selection"
-            st.session_state.board.reset()
-            if "chess_exported" in st.session_state:
-                del st.session_state.chess_exported
-            st.rerun()
-
-
-
 
     # --- PLAYING PHASE ---
     elif st.session_state.chess_game_phase == 'playing':
@@ -567,7 +505,3 @@ st.sidebar.header("About")
 st.sidebar.info(
     "This is a collection of simple games built using Streamlit."
 )
-
-# To run this app:
-# 1. Run the command: streamlit run app.py
-
