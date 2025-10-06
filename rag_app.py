@@ -2,6 +2,7 @@ import streamlit as st
 from graph_retriever import GraphRetriever
 from multi_hop_retriever import MultiHopRetriever
 import os
+from PIL import Image
 
 # --- Page Configuration ---
 st.set_page_config(
@@ -54,8 +55,11 @@ if retriever:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
             if "trace" in message and message["trace"]:
-                with st.expander("Show Reasoning Trace"):
+                with st.expander("Show Reasoning Trace and Knowledge Graph"):
                     st.text_area("Trace", message["trace"], height=200)
+                    if os.path.exists("chs-850-0001_knowledge_graph.png"):
+                        image = Image.open("chs-850-0001_knowledge_graph.png")
+                        st.image(image, caption="Knowledge Graph Visualization")
 
     # User input
     if prompt := st.chat_input("Ask a question about the chess game..."):
@@ -71,9 +75,13 @@ if retriever:
                 
                 st.markdown(final_answer)
 
-                with st.expander("Show Reasoning Trace"):
+                with st.expander("Show Reasoning Trace and Knowledge Graph"):
                     # Display the reasoning trace correctly as a single block of text
                     st.text_area("Trace", reasoning_trace, height=200)
+                    # Display the knowledge graph image
+                    if os.path.exists("chs-850-0001_knowledge_graph.png"):
+                        image = Image.open("chs-850-0001_knowledge_graph.png")
+                        st.image(image, caption="Knowledge Graph Visualization")
 
                 # Add assistant response to history
                 st.session_state.messages.append({
