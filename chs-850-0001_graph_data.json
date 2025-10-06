@@ -1,0 +1,1765 @@
+{
+    "entities": [
+        {
+            "id": "player-white",
+            "type": "PLAYER",
+            "name": "White",
+            "attributes": {
+                "outcome": "Winner"
+            }
+        },
+        {
+            "id": "player-black",
+            "type": "PLAYER",
+            "name": "Black",
+            "attributes": {
+                "outcome": "Loser"
+            }
+        },
+        {
+            "id": "turn-1",
+            "type": "TURN",
+            "name": "Turn 1"
+        },
+        {
+            "id": "piece-w-qpawn",
+            "type": "PIECE",
+            "name": "White's queen's pawn"
+        },
+        {
+            "id": "square-d4",
+            "type": "SQUARE",
+            "name": "d4"
+        },
+        {
+            "id": "key_move-1",
+            "type": "KEY_MOVE",
+            "name": "queen's pawn to d4"
+        },
+        {
+            "id": "strategy-center-control",
+            "type": "STRATEGY",
+            "name": "Control the center"
+        },
+        {
+            "id": "turn-2",
+            "type": "TURN",
+            "name": "Turn 2"
+        },
+        {
+            "id": "piece-b-kknight",
+            "type": "PIECE",
+            "name": "Black's king's knight"
+        },
+        {
+            "id": "square-f6",
+            "type": "SQUARE",
+            "name": "f6"
+        },
+        {
+            "id": "key_move-2",
+            "type": "KEY_MOVE",
+            "name": "king's knight to f6"
+        },
+        {
+            "id": "turn-3",
+            "type": "TURN",
+            "name": "Turn 3"
+        },
+        {
+            "id": "piece-w-qknight",
+            "type": "PIECE",
+            "name": "White's queen's knight"
+        },
+        {
+            "id": "square-c3",
+            "type": "SQUARE",
+            "name": "c3"
+        },
+        {
+            "id": "key_move-3",
+            "type": "KEY_MOVE",
+            "name": "queen's knight to c3"
+        },
+        {
+            "id": "turn-4",
+            "type": "TURN",
+            "name": "Turn 4"
+        },
+        {
+            "id": "piece-b-dpawn",
+            "type": "PIECE",
+            "name": "Black's d-pawn"
+        },
+        {
+            "id": "square-d5",
+            "type": "SQUARE",
+            "name": "d5"
+        },
+        {
+            "id": "key_move-4",
+            "type": "KEY_MOVE",
+            "name": "d-pawn to d5"
+        },
+        {
+            "id": "turn-5",
+            "type": "TURN",
+            "name": "Turn 5"
+        },
+        {
+            "id": "piece-w-gpawn",
+            "type": "PIECE",
+            "name": "White's g-pawn"
+        },
+        {
+            "id": "square-g3",
+            "type": "SQUARE",
+            "name": "g3"
+        },
+        {
+            "id": "key_move-5",
+            "type": "KEY_MOVE",
+            "name": "g-pawn to g3"
+        },
+        {
+            "id": "strategy-fianchetto",
+            "type": "STRATEGY",
+            "name": "Fianchetto"
+        },
+        {
+            "id": "piece-w-kbishop",
+            "type": "PIECE",
+            "name": "White's king's bishop"
+        },
+        {
+            "id": "turn-6",
+            "type": "TURN",
+            "name": "Turn 6"
+        },
+        {
+            "id": "piece-b-king",
+            "type": "PIECE",
+            "name": "Black's King"
+        },
+        {
+            "id": "square-d7",
+            "type": "SQUARE",
+            "name": "d7"
+        },
+        {
+            "id": "key_move-6",
+            "type": "KEY_MOVE",
+            "name": "King to d7"
+        },
+        {
+            "id": "strategy-risky-king-move",
+            "type": "STRATEGY",
+            "name": "Massive strategic risk"
+        },
+        {
+            "id": "turn-7",
+            "type": "TURN",
+            "name": "Turn 7"
+        },
+        {
+            "id": "square-g2",
+            "type": "SQUARE",
+            "name": "g2"
+        },
+        {
+            "id": "key_move-7",
+            "type": "KEY_MOVE",
+            "name": "king's bishop to g2"
+        },
+        {
+            "id": "turn-8",
+            "type": "TURN",
+            "name": "Turn 8"
+        },
+        {
+            "id": "piece-b-cpawn",
+            "type": "PIECE",
+            "name": "Black's c-pawn"
+        },
+        {
+            "id": "square-c6",
+            "type": "SQUARE",
+            "name": "c6"
+        },
+        {
+            "id": "key_move-8",
+            "type": "KEY_MOVE",
+            "name": "c-pawn to c6"
+        },
+        {
+            "id": "turn-9",
+            "type": "TURN",
+            "name": "Turn 9"
+        },
+        {
+            "id": "piece-w-epawn",
+            "type": "PIECE",
+            "name": "White's e-pawn"
+        },
+        {
+            "id": "square-e4",
+            "type": "SQUARE",
+            "name": "e4"
+        },
+        {
+            "id": "key_move-9",
+            "type": "KEY_MOVE",
+            "name": "e-pawn to e4"
+        },
+        {
+            "id": "turn-10",
+            "type": "TURN",
+            "name": "Turn 10"
+        },
+        {
+            "id": "piece-b-qknight",
+            "type": "PIECE",
+            "name": "Black's queen's knight"
+        },
+        {
+            "id": "square-a6",
+            "type": "SQUARE",
+            "name": "a6"
+        },
+        {
+            "id": "key_move-10",
+            "type": "KEY_MOVE",
+            "name": "queen's knight to a6"
+        },
+        {
+            "id": "turn-11",
+            "type": "TURN",
+            "name": "Turn 11"
+        },
+        {
+            "id": "key_move-11",
+            "type": "KEY_MOVE",
+            "name": "e-pawn captures pawn on d5"
+        },
+        {
+            "id": "turn-12",
+            "type": "TURN",
+            "name": "Turn 12"
+        },
+        {
+            "id": "key_move-12",
+            "type": "KEY_MOVE",
+            "name": "c-pawn captures pawn on d5"
+        },
+        {
+            "id": "turn-13",
+            "type": "TURN",
+            "name": "Turn 13"
+        },
+        {
+            "id": "key_move-13",
+            "type": "KEY_MOVE",
+            "name": "queen's knight captures pawn on d5"
+        },
+        {
+            "id": "turn-14",
+            "type": "TURN",
+            "name": "Turn 14"
+        },
+        {
+            "id": "key_move-14",
+            "type": "KEY_MOVE",
+            "name": "king's knight captures knight on d5"
+        },
+        {
+            "id": "turn-15",
+            "type": "TURN",
+            "name": "Turn 15"
+        },
+        {
+            "id": "key_move-15",
+            "type": "KEY_MOVE",
+            "name": "bishop captures knight on d5"
+        },
+        {
+            "id": "turn-16",
+            "type": "TURN",
+            "name": "Turn 16"
+        },
+        {
+            "id": "piece-b-epawn",
+            "type": "PIECE",
+            "name": "Black's e-pawn"
+        },
+        {
+            "id": "square-e6",
+            "type": "SQUARE",
+            "name": "e6"
+        },
+        {
+            "id": "key_move-16",
+            "type": "KEY_MOVE",
+            "name": "e-pawn to e6"
+        },
+        {
+            "id": "turn-17",
+            "type": "TURN",
+            "name": "Turn 17"
+        },
+        {
+            "id": "piece-w-queen",
+            "type": "PIECE",
+            "name": "White's Queen"
+        },
+        {
+            "id": "square-g4",
+            "type": "SQUARE",
+            "name": "g4"
+        },
+        {
+            "id": "key_move-17",
+            "type": "KEY_MOVE",
+            "name": "Queen to g4"
+        },
+        {
+            "id": "turn-18",
+            "type": "TURN",
+            "name": "Turn 18"
+        },
+        {
+            "id": "piece-b-queen",
+            "type": "PIECE",
+            "name": "Black's Queen"
+        },
+        {
+            "id": "square-c7",
+            "type": "SQUARE",
+            "name": "c7"
+        },
+        {
+            "id": "key_move-18",
+            "type": "KEY_MOVE",
+            "name": "Queen to c7"
+        },
+        {
+            "id": "turn-19",
+            "type": "TURN",
+            "name": "Turn 19"
+        },
+        {
+            "id": "piece-w-kknight",
+            "type": "PIECE",
+            "name": "White's king's knight"
+        },
+        {
+            "id": "square-f3",
+            "type": "SQUARE",
+            "name": "f3"
+        },
+        {
+            "id": "key_move-19",
+            "type": "KEY_MOVE",
+            "name": "king's knight to f3"
+        },
+        {
+            "id": "turn-20",
+            "type": "TURN",
+            "name": "Turn 20"
+        },
+        {
+            "id": "piece-b-kbishop",
+            "type": "PIECE",
+            "name": "Black's king's bishop"
+        },
+        {
+            "id": "square-b4",
+            "type": "SQUARE",
+            "name": "b4"
+        },
+        {
+            "id": "key_move-20",
+            "type": "KEY_MOVE",
+            "name": "king's bishop to b4"
+        },
+        {
+            "id": "piece-w-king",
+            "type": "PIECE",
+            "name": "White's king"
+        },
+        {
+            "id": "turn-21",
+            "type": "TURN",
+            "name": "Turn 21"
+        },
+        {
+            "id": "piece-w-cpawn",
+            "type": "PIECE",
+            "name": "White's c-pawn"
+        },
+        {
+            "id": "key_move-21",
+            "type": "KEY_MOVE",
+            "name": "c-pawn to c3"
+        },
+        {
+            "id": "turn-22",
+            "type": "TURN",
+            "name": "Turn 22"
+        },
+        {
+            "id": "key_move-22",
+            "type": "KEY_MOVE",
+            "name": "bishop captures pawn on c3"
+        },
+        {
+            "id": "turn-23",
+            "type": "TURN",
+            "name": "Turn 23"
+        },
+        {
+            "id": "piece-w-bpawn",
+            "type": "PIECE",
+            "name": "White's b-pawn"
+        },
+        {
+            "id": "key_move-23",
+            "type": "KEY_MOVE",
+            "name": "b-pawn recaptures bishop"
+        },
+        {
+            "id": "turn-24",
+            "type": "TURN",
+            "name": "Turn 24"
+        },
+        {
+            "id": "key_move-24",
+            "type": "KEY_MOVE",
+            "name": "Queen captures pawn on c3"
+        },
+        {
+            "id": "turn-25",
+            "type": "TURN",
+            "name": "Turn 25"
+        },
+        {
+            "id": "square-e2",
+            "type": "SQUARE",
+            "name": "e2"
+        },
+        {
+            "id": "key_move-25",
+            "type": "KEY_MOVE",
+            "name": "King to e2"
+        },
+        {
+            "id": "turn-26",
+            "type": "TURN",
+            "name": "Turn 26"
+        },
+        {
+            "id": "square-a1",
+            "type": "SQUARE",
+            "name": "a1"
+        },
+        {
+            "id": "key_move-26",
+            "type": "KEY_MOVE",
+            "name": "Queen to a1"
+        },
+        {
+            "id": "piece-w-rook-a1",
+            "type": "PIECE",
+            "name": "White's rook on a1"
+        },
+        {
+            "id": "turn-27",
+            "type": "TURN",
+            "name": "Turn 27"
+        },
+        {
+            "id": "square-e5",
+            "type": "SQUARE",
+            "name": "e5"
+        },
+        {
+            "id": "key_move-27",
+            "type": "KEY_MOVE",
+            "name": "knight to e5"
+        },
+        {
+            "id": "strategy-king-hunt",
+            "type": "STRATEGY",
+            "name": "King hunt"
+        },
+        {
+            "id": "turn-28",
+            "type": "TURN",
+            "name": "Turn 28"
+        },
+        {
+            "id": "key_move-28",
+            "type": "KEY_MOVE",
+            "name": "King to c7"
+        },
+        {
+            "id": "turn-29",
+            "type": "TURN",
+            "name": "Turn 29"
+        },
+        {
+            "id": "key_move-29",
+            "type": "KEY_MOVE",
+            "name": "Queen captures g-pawn"
+        },
+        {
+            "id": "turn-30",
+            "type": "TURN",
+            "name": "Turn 30"
+        },
+        {
+            "id": "key_move-30",
+            "type": "KEY_MOVE",
+            "name": "Queen captures pawn on d4"
+        },
+        {
+            "id": "turn-31",
+            "type": "TURN",
+            "name": "Turn 31"
+        },
+        {
+            "id": "key_move-31",
+            "type": "KEY_MOVE",
+            "name": "Queen captures f-pawn"
+        },
+        {
+            "id": "turn-32",
+            "type": "TURN",
+            "name": "Turn 32"
+        },
+        {
+            "id": "square-b6",
+            "type": "SQUARE",
+            "name": "b6"
+        },
+        {
+            "id": "key_move-32",
+            "type": "KEY_MOVE",
+            "name": "King to b6"
+        },
+        {
+            "id": "turn-33",
+            "type": "TURN",
+            "name": "Turn 33"
+        },
+        {
+            "id": "square-c4",
+            "type": "SQUARE",
+            "name": "c4"
+        },
+        {
+            "id": "key_move-33",
+            "type": "KEY_MOVE",
+            "name": "knight to c4"
+        },
+        {
+            "id": "turn-34",
+            "type": "TURN",
+            "name": "Turn 34"
+        },
+        {
+            "id": "square-b5",
+            "type": "SQUARE",
+            "name": "b5"
+        },
+        {
+            "id": "key_move-34",
+            "type": "KEY_MOVE",
+            "name": "King to b5"
+        },
+        {
+            "id": "turn-35",
+            "type": "TURN",
+            "name": "Turn 35"
+        },
+        {
+            "id": "piece-w-krook",
+            "type": "PIECE",
+            "name": "White's king's rook"
+        },
+        {
+            "id": "square-d1",
+            "type": "SQUARE",
+            "name": "d1"
+        },
+        {
+            "id": "key_move-35",
+            "type": "KEY_MOVE",
+            "name": "rook to d1"
+        },
+        {
+            "id": "turn-36",
+            "type": "TURN",
+            "name": "Turn 36"
+        },
+        {
+            "id": "key_move-36",
+            "type": "KEY_MOVE",
+            "name": "Queen to g4 check"
+        },
+        {
+            "id": "turn-37",
+            "type": "TURN",
+            "name": "Turn 37"
+        },
+        {
+            "id": "piece-w-fpawn",
+            "type": "PIECE",
+            "name": "White's f-pawn"
+        },
+        {
+            "id": "key_move-37",
+            "type": "KEY_MOVE",
+            "name": "block with f-pawn"
+        },
+        {
+            "id": "turn-38",
+            "type": "TURN",
+            "name": "Turn 38"
+        },
+        {
+            "id": "square-f5",
+            "type": "SQUARE",
+            "name": "f5"
+        },
+        {
+            "id": "key_move-38",
+            "type": "KEY_MOVE",
+            "name": "Queen to f5"
+        },
+        {
+            "id": "turn-39",
+            "type": "TURN",
+            "name": "Turn 39"
+        },
+        {
+            "id": "square-d6",
+            "type": "SQUARE",
+            "name": "d6"
+        },
+        {
+            "id": "key_move-39",
+            "type": "KEY_MOVE",
+            "name": "knight to d6"
+        },
+        {
+            "id": "turn-40",
+            "type": "TURN",
+            "name": "Turn 40"
+        },
+        {
+            "id": "key_move-40",
+            "type": "KEY_MOVE",
+            "name": "King to b6"
+        },
+        {
+            "id": "turn-41",
+            "type": "TURN",
+            "name": "Turn 41"
+        },
+        {
+            "id": "piece-w-qbishop",
+            "type": "PIECE",
+            "name": "White's queen's bishop"
+        },
+        {
+            "id": "square-e3",
+            "type": "SQUARE",
+            "name": "e3"
+        },
+        {
+            "id": "key_move-41",
+            "type": "KEY_MOVE",
+            "name": "bishop to e3"
+        },
+        {
+            "id": "turn-42",
+            "type": "TURN",
+            "name": "Turn 42"
+        },
+        {
+            "id": "square-a5",
+            "type": "SQUARE",
+            "name": "a5"
+        },
+        {
+            "id": "key_move-42",
+            "type": "KEY_MOVE",
+            "name": "King to a5"
+        },
+        {
+            "id": "turn-43",
+            "type": "TURN",
+            "name": "Turn 43"
+        },
+        {
+            "id": "strategy-blunder",
+            "type": "STRATEGY",
+            "name": "Catastrophic blunder"
+        },
+        {
+            "id": "key_move-43",
+            "type": "KEY_MOVE",
+            "name": "knight captures Queen"
+        },
+        {
+            "id": "turn-44",
+            "type": "TURN",
+            "name": "Turn 44"
+        },
+        {
+            "id": "key_move-44",
+            "type": "KEY_MOVE",
+            "name": "e-pawn captures bishop on d5"
+        },
+        {
+            "id": "turn-45",
+            "type": "TURN",
+            "name": "Turn 45"
+        },
+        {
+            "id": "key_move-45",
+            "type": "KEY_MOVE",
+            "name": "Queen recaptures pawn on d5"
+        },
+        {
+            "id": "turn-46",
+            "type": "TURN",
+            "name": "Turn 46"
+        },
+        {
+            "id": "piece-b-bpawn",
+            "type": "PIECE",
+            "name": "Black's b-pawn"
+        },
+        {
+            "id": "key_move-46",
+            "type": "KEY_MOVE",
+            "name": "b-pawn blocks check"
+        },
+        {
+            "id": "turn-47",
+            "type": "TURN",
+            "name": "Turn 47"
+        },
+        {
+            "id": "square-d2",
+            "type": "SQUARE",
+            "name": "d2"
+        },
+        {
+            "id": "key_move-47",
+            "type": "KEY_MOVE",
+            "name": "Queen to d2 check"
+        },
+        {
+            "id": "turn-48",
+            "type": "TURN",
+            "name": "Turn 48"
+        },
+        {
+            "id": "key_move-48",
+            "type": "KEY_MOVE",
+            "name": "knight blocks on b4"
+        },
+        {
+            "id": "turn-49",
+            "type": "TURN",
+            "name": "Turn 49"
+        },
+        {
+            "id": "piece-w-apawn",
+            "type": "PIECE",
+            "name": "White's a-pawn"
+        },
+        {
+            "id": "square-a3",
+            "type": "SQUARE",
+            "name": "a3"
+        },
+        {
+            "id": "key_move-49",
+            "type": "KEY_MOVE",
+            "name": "a-pawn to a3"
+        },
+        {
+            "id": "turn-50",
+            "type": "TURN",
+            "name": "Turn 50"
+        },
+        {
+            "id": "key_move-50",
+            "type": "KEY_MOVE",
+            "name": "bishop captures knight"
+        },
+        {
+            "id": "turn-51",
+            "type": "TURN",
+            "name": "Turn 51"
+        },
+        {
+            "id": "key_move-51",
+            "type": "KEY_MOVE",
+            "name": "Queen captures knight on b4"
+        },
+        {
+            "id": "turn-52",
+            "type": "TURN",
+            "name": "Turn 52"
+        },
+        {
+            "id": "key_move-52",
+            "type": "KEY_MOVE",
+            "name": "King to a6"
+        },
+        {
+            "id": "turn-53",
+            "type": "TURN",
+            "name": "Turn 53"
+        },
+        {
+            "id": "key_move-53",
+            "type": "KEY_MOVE",
+            "name": "rook to d6 check"
+        },
+        {
+            "id": "turn-54",
+            "type": "TURN",
+            "name": "Turn 54"
+        },
+        {
+            "id": "square-b7",
+            "type": "SQUARE",
+            "name": "b7"
+        },
+        {
+            "id": "key_move-54",
+            "type": "KEY_MOVE",
+            "name": "King to b7"
+        },
+        {
+            "id": "turn-55",
+            "type": "TURN",
+            "name": "Turn 55"
+        },
+        {
+            "id": "key_move-55",
+            "type": "KEY_MOVE",
+            "name": "Queen captures pawn on b5"
+        },
+        {
+            "id": "turn-56",
+            "type": "TURN",
+            "name": "Turn 56"
+        },
+        {
+            "id": "key_move-56",
+            "type": "KEY_MOVE",
+            "name": "King to c7"
+        },
+        {
+            "id": "turn-57",
+            "type": "TURN",
+            "name": "Turn 57"
+        },
+        {
+            "id": "square-c6_queen",
+            "type": "SQUARE",
+            "name": "c6"
+        },
+        {
+            "id": "key_move-57",
+            "type": "KEY_MOVE",
+            "name": "Queen to c6 check"
+        },
+        {
+            "id": "turn-58",
+            "type": "TURN",
+            "name": "Turn 58"
+        },
+        {
+            "id": "square-b8",
+            "type": "SQUARE",
+            "name": "b8"
+        },
+        {
+            "id": "key_move-58",
+            "type": "KEY_MOVE",
+            "name": "King to b8"
+        },
+        {
+            "id": "turn-59",
+            "type": "TURN",
+            "name": "Turn 59"
+        },
+        {
+            "id": "square-f4",
+            "type": "SQUARE",
+            "name": "f4"
+        },
+        {
+            "id": "key_move-59",
+            "type": "KEY_MOVE",
+            "name": "bishop to f4"
+        },
+        {
+            "id": "turn-60",
+            "type": "TURN",
+            "name": "Turn 60"
+        },
+        {
+            "id": "piece-b-hpawn",
+            "type": "PIECE",
+            "name": "Black's h-pawn"
+        },
+        {
+            "id": "key_move-60",
+            "type": "KEY_MOVE",
+            "name": "h-pawn push"
+        },
+        {
+            "id": "turn-61",
+            "type": "TURN",
+            "name": "Turn 61"
+        },
+        {
+            "id": "square-d8",
+            "type": "SQUARE",
+            "name": "d8"
+        },
+        {
+            "id": "key_move-61",
+            "type": "KEY_MOVE",
+            "name": "rook to d8",
+            "attributes": {
+                "is_checkmate": true
+            }
+        },
+        {
+            "id": "game-outcome-checkmate",
+            "type": "GAME_OUTCOME",
+            "name": "Checkmate"
+        },
+        {
+            "id": "game-outcome-white-wins",
+            "type": "GAME_OUTCOME",
+            "name": "White wins"
+        }
+    ],
+    "relations": [
+        {
+            "subject": "player-white",
+            "object": "key_move-1",
+            "turn": "turn-1",
+            "relationship": "MAKES_MOVE",
+            "context": "White opens with the queen's pawn, moving it two squares forward to the d4 square."
+        },
+        {
+            "subject": "piece-w-qpawn",
+            "object": "square-d4",
+            "turn": "turn-1",
+            "relationship": "MOVES_TO",
+            "context": "moving it two squares forward to the d4 square."
+        },
+        {
+            "subject": "key_move-1",
+            "object": "strategy-center-control",
+            "turn": "turn-1",
+            "relationship": "AIMS_FOR",
+            "context": "A classic, solid start, aiming to control the center of the board."
+        },
+        {
+            "subject": "player-black",
+            "object": "key_move-2",
+            "turn": "turn-2",
+            "relationship": "MAKES_MOVE",
+            "context": "Black immediately challenges that central control, developing the king's knight to f6."
+        },
+        {
+            "subject": "piece-b-kknight",
+            "object": "square-f6",
+            "turn": "turn-2",
+            "relationship": "MOVES_TO",
+            "context": "developing the king's knight to f6."
+        },
+        {
+            "subject": "key_move-2",
+            "object": "strategy-center-control",
+            "turn": "turn-2",
+            "relationship": "CHALLENGES",
+            "context": "Black immediately challenges that central control."
+        },
+        {
+            "subject": "player-white",
+            "object": "key_move-3",
+            "turn": "turn-3",
+            "relationship": "MAKES_MOVE",
+            "context": "White develops the queen's knight to c3."
+        },
+        {
+            "subject": "piece-w-qknight",
+            "object": "square-c3",
+            "turn": "turn-3",
+            "relationship": "MOVES_TO",
+            "context": "develops the queen's knight to c3."
+        },
+        {
+            "subject": "piece-w-qknight",
+            "object": "piece-w-qpawn",
+            "turn": "turn-3",
+            "relationship": "SUPPORTS",
+            "context": "preparing to support the d4 pawn."
+        },
+        {
+            "subject": "player-black",
+            "object": "key_move-4",
+            "turn": "turn-4",
+            "relationship": "MAKES_MOVE",
+            "context": "Black mirrors White's pawn move, pushing the d-pawn to d5."
+        },
+        {
+            "subject": "piece-b-dpawn",
+            "object": "square-d5",
+            "turn": "turn-4",
+            "relationship": "MOVES_TO",
+            "context": "pushing the d-pawn to d5."
+        },
+        {
+            "subject": "player-white",
+            "object": "key_move-5",
+            "turn": "turn-5",
+            "relationship": "MAKES_MOVE",
+            "context": "White plays the g-pawn to g3."
+        },
+        {
+            "subject": "piece-w-gpawn",
+            "object": "square-g3",
+            "turn": "turn-5",
+            "relationship": "MOVES_TO",
+            "context": "plays the g-pawn to g3."
+        },
+        {
+            "subject": "key_move-5",
+            "object": "strategy-fianchetto",
+            "turn": "turn-5",
+            "relationship": "ENABLES",
+            "context": "This signals an intention to place the king's bishop on the long diagonal, a setup known as a fianchetto."
+        },
+        {
+            "subject": "player-black",
+            "object": "key_move-6",
+            "turn": "turn-6",
+            "relationship": "MAKES_MOVE",
+            "context": "Black moves the King to d7. This is incredibly unusual."
+        },
+        {
+            "subject": "piece-b-king",
+            "object": "square-d7",
+            "turn": "turn-6",
+            "relationship": "MOVES_TO",
+            "context": "moves the King to d7."
+        },
+        {
+            "subject": "key_move-6",
+            "object": "strategy-risky-king-move",
+            "turn": "turn-6",
+            "relationship": "IS_A",
+            "context": "This is a massive strategic risk, placing the monarch in a potentially vulnerable position."
+        },
+        {
+            "subject": "player-white",
+            "object": "key_move-7",
+            "turn": "turn-7",
+            "relationship": "MAKES_MOVE",
+            "context": "White calmly proceeds with the plan, placing the king's bishop on the g2 square."
+        },
+        {
+            "subject": "piece-w-kbishop",
+            "object": "square-g2",
+            "turn": "turn-7",
+            "relationship": "MOVES_TO",
+            "context": "placing the king's bishop on the g2 square."
+        },
+        {
+            "subject": "player-black",
+            "object": "key_move-8",
+            "turn": "turn-8",
+            "relationship": "MAKES_MOVE",
+            "context": "Black bolsters the center by moving the c-pawn to c6."
+        },
+        {
+            "subject": "piece-b-cpawn",
+            "object": "square-c6",
+            "turn": "turn-8",
+            "relationship": "MOVES_TO",
+            "context": "moving the c-pawn to c6."
+        },
+        {
+            "subject": "piece-b-cpawn",
+            "object": "piece-b-dpawn",
+            "turn": "turn-8",
+            "relationship": "SUPPORTS",
+            "context": "A solid move to support the d5 pawn."
+        },
+        {
+            "subject": "player-white",
+            "object": "key_move-9",
+            "turn": "turn-9",
+            "relationship": "MAKES_MOVE",
+            "context": "White raises the stakes, pushing the e-pawn to e4."
+        },
+        {
+            "subject": "piece-w-epawn",
+            "object": "square-e4",
+            "turn": "turn-9",
+            "relationship": "MOVES_TO",
+            "context": "pushing the e-pawn to e4."
+        },
+        {
+            "subject": "player-black",
+            "object": "key_move-10",
+            "turn": "turn-10",
+            "relationship": "MAKES_MOVE",
+            "context": "Black develops the queen's knight to a6."
+        },
+        {
+            "subject": "piece-b-qknight",
+            "object": "square-a6",
+            "turn": "turn-10",
+            "relationship": "MOVES_TO",
+            "context": "develops the queen's knight to a6."
+        },
+        {
+            "subject": "player-white",
+            "object": "key_move-11",
+            "turn": "turn-11",
+            "relationship": "MAKES_MOVE",
+            "context": "The first capture! White's e-pawn captures Black's pawn on d5."
+        },
+        {
+            "subject": "piece-w-epawn",
+            "object": "piece-b-dpawn",
+            "turn": "turn-11",
+            "relationship": "CAPTURES",
+            "context": "White's e-pawn captures Black's pawn on d5."
+        },
+        {
+            "subject": "player-black",
+            "object": "key_move-12",
+            "turn": "turn-12",
+            "relationship": "MAKES_MOVE",
+            "context": "Black immediately recaptures, taking the pawn on d5 with the c-pawn."
+        },
+        {
+            "subject": "piece-b-cpawn",
+            "object": "piece-w-epawn",
+            "turn": "turn-12",
+            "relationship": "CAPTURES",
+            "context": "taking the pawn on d5 with the c-pawn."
+        },
+        {
+            "subject": "player-white",
+            "object": "key_move-13",
+            "turn": "turn-13",
+            "relationship": "MAKES_MOVE",
+            "context": "White continues the exchanges, capturing the pawn on d5 with the queen's knight."
+        },
+        {
+            "subject": "piece-w-qknight",
+            "object": "piece-b-cpawn",
+            "turn": "turn-13",
+            "relationship": "CAPTURES",
+            "context": "capturing the pawn on d5 with the queen's knight."
+        },
+        {
+            "subject": "player-black",
+            "object": "key_move-14",
+            "turn": "turn-14",
+            "relationship": "MAKES_MOVE",
+            "context": "Black is happy to trade, capturing the knight on d5 with the king's knight."
+        },
+        {
+            "subject": "piece-b-kknight",
+            "object": "piece-w-qknight",
+            "turn": "turn-14",
+            "relationship": "CAPTURES",
+            "context": "capturing the knight on d5 with the king's knight."
+        },
+        {
+            "subject": "player-white",
+            "object": "key_move-15",
+            "turn": "turn-15",
+            "relationship": "MAKES_MOVE",
+            "context": "And White completes the sequence of captures, taking the knight on d5 with the powerful bishop from g2."
+        },
+        {
+            "subject": "piece-w-kbishop",
+            "object": "piece-b-kknight",
+            "turn": "turn-15",
+            "relationship": "CAPTURES",
+            "context": "taking the knight on d5 with the powerful bishop from g2."
+        },
+        {
+            "subject": "player-black",
+            "object": "key_move-16",
+            "turn": "turn-16",
+            "relationship": "MAKES_MOVE",
+            "context": "Black pushes the e-pawn to e6."
+        },
+        {
+            "subject": "piece-b-epawn",
+            "object": "square-e6",
+            "turn": "turn-16",
+            "relationship": "MOVES_TO",
+            "context": "pushes the e-pawn to e6."
+        },
+        {
+            "subject": "key_move-16",
+            "object": "piece-w-kbishop",
+            "turn": "turn-16",
+            "relationship": "RESTRICTS",
+            "context": "restricting the scope of that powerful white bishop."
+        },
+        {
+            "subject": "player-white",
+            "object": "key_move-17",
+            "turn": "turn-17",
+            "relationship": "MAKES_MOVE",
+            "context": "White brings out the most powerful piece, the Queen, moving it to g4."
+        },
+        {
+            "subject": "piece-w-queen",
+            "object": "square-g4",
+            "turn": "turn-17",
+            "relationship": "MOVES_TO",
+            "context": "moving it to g4."
+        },
+        {
+            "subject": "player-black",
+            "object": "key_move-18",
+            "turn": "turn-18",
+            "relationship": "MAKES_MOVE",
+            "context": "Black responds by moving the Queen to c7."
+        },
+        {
+            "subject": "piece-b-queen",
+            "object": "square-c7",
+            "turn": "turn-18",
+            "relationship": "MOVES_TO",
+            "context": "moving the Queen to c7."
+        },
+        {
+            "subject": "player-white",
+            "object": "key_move-19",
+            "turn": "turn-19",
+            "relationship": "MAKES_MOVE",
+            "context": "White develops the king's knight to f3."
+        },
+        {
+            "subject": "piece-w-kknight",
+            "object": "square-f3",
+            "turn": "turn-19",
+            "relationship": "MOVES_TO",
+            "context": "develops the king's knight to f3."
+        },
+        {
+            "subject": "player-black",
+            "object": "key_move-20",
+            "turn": "turn-20",
+            "relationship": "MAKES_MOVE",
+            "context": "Black's king's bishop jumps to b4, delivering a check to the white king."
+        },
+        {
+            "subject": "key_move-20",
+            "object": "piece-w-king",
+            "turn": "turn-20",
+            "relationship": "DELIVERS_CHECK_TO",
+            "context": "delivering a check to the white king."
+        },
+        {
+            "subject": "player-white",
+            "object": "key_move-21",
+            "turn": "turn-21",
+            "relationship": "MAKES_MOVE",
+            "context": "White blocks the check by moving the c-pawn to c3."
+        },
+        {
+            "subject": "key_move-21",
+            "object": "key_move-20",
+            "turn": "turn-21",
+            "relationship": "BLOCKS",
+            "context": "White blocks the check."
+        },
+        {
+            "subject": "player-black",
+            "object": "key_move-22",
+            "turn": "turn-22",
+            "relationship": "MAKES_MOVE",
+            "context": "Black captures the pawn on c3 with the bishop, delivering another check!"
+        },
+        {
+            "subject": "piece-b-kbishop",
+            "object": "piece-w-cpawn",
+            "turn": "turn-22",
+            "relationship": "CAPTURES",
+            "context": "captures the pawn on c3 with the bishop."
+        },
+        {
+            "subject": "key_move-22",
+            "object": "piece-w-king",
+            "turn": "turn-22",
+            "relationship": "DELIVERS_CHECK_TO",
+            "context": "delivering another check!"
+        },
+        {
+            "subject": "player-white",
+            "object": "key_move-23",
+            "turn": "turn-23",
+            "relationship": "MAKES_MOVE",
+            "context": "White recaptures the bishop with the b-pawn."
+        },
+        {
+            "subject": "piece-w-bpawn",
+            "object": "piece-b-kbishop",
+            "turn": "turn-23",
+            "relationship": "CAPTURES",
+            "context": "recaptures the bishop with the b-pawn."
+        },
+        {
+            "subject": "player-black",
+            "object": "key_move-24",
+            "turn": "turn-24",
+            "relationship": "MAKES_MOVE",
+            "context": "And Black's Queen swoops in to capture the pawn on c3, delivering a third consecutive check."
+        },
+        {
+            "subject": "piece-b-queen",
+            "object": "piece-w-bpawn",
+            "turn": "turn-24",
+            "relationship": "CAPTURES",
+            "context": "Queen swoops in to capture the pawn on c3."
+        },
+        {
+            "subject": "key_move-24",
+            "object": "piece-w-king",
+            "turn": "turn-24",
+            "relationship": "DELIVERS_CHECK_TO",
+            "context": "delivering a third consecutive check."
+        },
+        {
+            "subject": "player-white",
+            "object": "key_move-25",
+            "turn": "turn-25",
+            "relationship": "MAKES_MOVE",
+            "context": "The white King is forced to move, stepping up to e2."
+        },
+        {
+            "subject": "piece-w-king",
+            "object": "square-e2",
+            "turn": "turn-25",
+            "relationship": "MOVES_TO",
+            "context": "stepping up to e2."
+        },
+        {
+            "subject": "player-black",
+            "object": "key_move-26",
+            "turn": "turn-26",
+            "relationship": "MAKES_MOVE",
+            "context": "The Queen dives all the way to a1 to capture White's rook."
+        },
+        {
+            "subject": "piece-b-queen",
+            "object": "piece-w-rook-a1",
+            "turn": "turn-26",
+            "relationship": "CAPTURES",
+            "context": "captures White's rook."
+        },
+        {
+            "subject": "player-white",
+            "object": "key_move-27",
+            "turn": "turn-27",
+            "relationship": "MAKES_MOVE",
+            "context": "White immediately punishes this, leaping the knight to e5 with a check!"
+        },
+        {
+            "subject": "key_move-27",
+            "object": "piece-b-king",
+            "turn": "turn-27",
+            "relationship": "DELIVERS_CHECK_TO",
+            "context": "leaping the knight to e5 with a check!"
+        },
+        {
+            "subject": "key_move-27",
+            "object": "strategy-king-hunt",
+            "turn": "turn-27",
+            "relationship": "BEGINS",
+            "context": "The attack begins!"
+        },
+        {
+            "subject": "player-black",
+            "object": "key_move-28",
+            "turn": "turn-28",
+            "relationship": "MAKES_MOVE",
+            "context": "The black King is forced to run, moving to c7."
+        },
+        {
+            "subject": "piece-b-king",
+            "object": "square-c7",
+            "turn": "turn-28",
+            "relationship": "MOVES_TO",
+            "context": "moving to c7."
+        },
+        {
+            "subject": "player-white",
+            "object": "key_move-29",
+            "turn": "turn-29",
+            "relationship": "MAKES_MOVE",
+            "context": "White's Queen joins the attack, capturing the g-pawn."
+        },
+        {
+            "subject": "player-black",
+            "object": "key_move-30",
+            "turn": "turn-30",
+            "relationship": "MAKES_MOVE",
+            "context": "Black's Queen begins the long journey back, capturing a pawn on d4."
+        },
+        {
+            "subject": "player-white",
+            "object": "key_move-31",
+            "turn": "turn-31",
+            "relationship": "MAKES_MOVE",
+            "context": "Another check! White's Queen captures the f-pawn."
+        },
+        {
+            "subject": "key_move-31",
+            "object": "piece-b-king",
+            "turn": "turn-31",
+            "relationship": "DELIVERS_CHECK_TO",
+            "context": "Another check!"
+        },
+        {
+            "subject": "player-black",
+            "object": "key_move-32",
+            "turn": "turn-32",
+            "relationship": "MAKES_MOVE",
+            "context": "The king is forced to flee again, this time to b6."
+        },
+        {
+            "subject": "piece-b-king",
+            "object": "square-b6",
+            "turn": "turn-32",
+            "relationship": "MOVES_TO",
+            "context": "this time to b6."
+        },
+        {
+            "subject": "player-white",
+            "object": "key_move-33",
+            "turn": "turn-33",
+            "relationship": "MAKES_MOVE",
+            "context": "It hops to c4, delivering another check."
+        },
+        {
+            "subject": "key_move-33",
+            "object": "piece-b-king",
+            "turn": "turn-33",
+            "relationship": "DELIVERS_CHECK_TO",
+            "context": "delivering another check."
+        },
+        {
+            "subject": "player-black",
+            "object": "key_move-34",
+            "turn": "turn-34",
+            "relationship": "MAKES_MOVE",
+            "context": "The king's journey continues to b5."
+        },
+        {
+            "subject": "piece-b-king",
+            "object": "square-b5",
+            "turn": "turn-34",
+            "relationship": "MOVES_TO",
+            "context": "continues to b5."
+        },
+        {
+            "subject": "player-white",
+            "object": "key_move-35",
+            "turn": "turn-35",
+            "relationship": "MAKES_MOVE",
+            "context": "White brings another piece into the attack, moving the king's rook to d1."
+        },
+        {
+            "subject": "piece-w-krook",
+            "object": "square-d1",
+            "turn": "turn-35",
+            "relationship": "MOVES_TO",
+            "context": "moving the king's rook to d1."
+        },
+        {
+            "subject": "player-black",
+            "object": "key_move-36",
+            "turn": "turn-36",
+            "relationship": "MAKES_MOVE",
+            "context": "Black's Queen tries to create some counterplay with a check on g4."
+        },
+        {
+            "subject": "key_move-36",
+            "object": "piece-w-king",
+            "turn": "turn-36",
+            "relationship": "DELIVERS_CHECK_TO",
+            "context": "with a check on g4."
+        },
+        {
+            "subject": "player-white",
+            "object": "key_move-37",
+            "turn": "turn-37",
+            "relationship": "MAKES_MOVE",
+            "context": "White simply blocks with the f-pawn."
+        },
+        {
+            "subject": "piece-w-fpawn",
+            "object": "key_move-36",
+            "turn": "turn-37",
+            "relationship": "BLOCKS",
+            "context": "blocks with the f-pawn."
+        },
+        {
+            "subject": "player-black",
+            "object": "key_move-38",
+            "turn": "turn-38",
+            "relationship": "MAKES_MOVE",
+            "context": "The black Queen moves to f5."
+        },
+        {
+            "subject": "piece-b-queen",
+            "object": "square-f5",
+            "turn": "turn-38",
+            "relationship": "MOVES_TO",
+            "context": "moves to f5."
+        },
+        {
+            "subject": "player-white",
+            "object": "key_move-39",
+            "turn": "turn-39",
+            "relationship": "MAKES_MOVE",
+            "context": "Another brutal knight check! The knight lands on d6."
+        },
+        {
+            "subject": "key_move-39",
+            "object": "piece-b-king",
+            "turn": "turn-39",
+            "relationship": "DELIVERS_CHECK_TO",
+            "context": "Another brutal knight check!"
+        },
+        {
+            "subject": "player-black",
+            "object": "key_move-40",
+            "turn": "turn-40",
+            "relationship": "MAKES_MOVE",
+            "context": "The king is forced to retreat back to b6."
+        },
+        {
+            "subject": "piece-b-king",
+            "object": "square-b6",
+            "turn": "turn-40",
+            "relationship": "MOVES_TO",
+            "context": "retreat back to b6."
+        },
+        {
+            "subject": "player-white",
+            "object": "key_move-41",
+            "turn": "turn-41",
+            "relationship": "MAKES_MOVE",
+            "context": "White's queen's bishop joins the party, delivering a check from e3."
+        },
+        {
+            "subject": "key_move-41",
+            "object": "piece-b-king",
+            "turn": "turn-41",
+            "relationship": "DELIVERS_CHECK_TO",
+            "context": "delivering a check from e3."
+        },
+        {
+            "subject": "player-black",
+            "object": "key_move-42",
+            "turn": "turn-42",
+            "relationship": "MAKES_MOVE",
+            "context": "The king has only one move, running to the edge of the board at a5."
+        },
+        {
+            "subject": "piece-b-king",
+            "object": "square-a5",
+            "turn": "turn-42",
+            "relationship": "MOVES_TO",
+            "context": "running to the edge of the board at a5."
+        },
+        {
+            "subject": "player-black",
+            "object": "strategy-blunder",
+            "turn": "turn-43",
+            "relationship": "COMMITS",
+            "context": "A CATASTROPHIC BLUNDER FROM BLACK! Black has left the Queen on f5 completely undefended."
+        },
+        {
+            "subject": "player-white",
+            "object": "key_move-43",
+            "turn": "turn-43",
+            "relationship": "MAKES_MOVE",
+            "context": "White's knight on d6 simply leaps over and captures the black Queen!"
+        },
+        {
+            "subject": "key_move-43",
+            "object": "strategy-blunder",
+            "turn": "turn-43",
+            "relationship": "EXPLOITS",
+            "context": "White's knight on d6 simply leaps over and captures the black Queen!"
+        },
+        {
+            "subject": "player-black",
+            "object": "key_move-44",
+            "turn": "turn-44",
+            "relationship": "MAKES_MOVE",
+            "context": "In a desperate move, Black's e-pawn captures White's bishop on d5."
+        },
+        {
+            "subject": "player-white",
+            "object": "key_move-45",
+            "turn": "turn-45",
+            "relationship": "MAKES_MOVE",
+            "context": "White's Queen recaptures the pawn on d5, with check."
+        },
+        {
+            "subject": "player-black",
+            "object": "key_move-46",
+            "turn": "turn-46",
+            "relationship": "MAKES_MOVE",
+            "context": "Black blocks the check with the b-pawn."
+        },
+        {
+            "subject": "player-white",
+            "object": "key_move-47",
+            "turn": "turn-47",
+            "relationship": "MAKES_MOVE",
+            "context": "The white Queen gives another check from d2."
+        },
+        {
+            "subject": "player-black",
+            "object": "key_move-48",
+            "turn": "turn-48",
+            "relationship": "MAKES_MOVE",
+            "context": "Black's knight blocks on b4."
+        },
+        {
+            "subject": "player-white",
+            "object": "key_move-49",
+            "turn": "turn-49",
+            "relationship": "MAKES_MOVE",
+            "context": "White methodically pushes the a-pawn to a3, tightening the net."
+        },
+        {
+            "subject": "player-black",
+            "object": "key_move-50",
+            "turn": "turn-50",
+            "relationship": "MAKES_MOVE",
+            "context": "Black's bishop captures the heroic white knight that won the queen earlier."
+        },
+        {
+            "subject": "player-white",
+            "object": "key_move-51",
+            "turn": "turn-51",
+            "relationship": "MAKES_MOVE",
+            "context": "The white Queen immediately captures that knight on b4, with check."
+        },
+        {
+            "subject": "player-black",
+            "object": "key_move-52",
+            "turn": "turn-52",
+            "relationship": "MAKES_MOVE",
+            "context": "The king is forced to a6."
+        },
+        {
+            "subject": "player-white",
+            "object": "key_move-53",
+            "turn": "turn-53",
+            "relationship": "MAKES_MOVE",
+            "context": "The rook now delivers a check from d6."
+        },
+        {
+            "subject": "player-black",
+            "object": "key_move-54",
+            "turn": "turn-54",
+            "relationship": "MAKES_MOVE",
+            "context": "The king shuffles to b7."
+        },
+        {
+            "subject": "player-white",
+            "object": "key_move-55",
+            "turn": "turn-55",
+            "relationship": "MAKES_MOVE",
+            "context": "The Queen captures another pawn on b5, with check."
+        },
+        {
+            "subject": "player-black",
+            "object": "key_move-56",
+            "turn": "turn-56",
+            "relationship": "MAKES_MOVE",
+            "context": "The king moves to c7."
+        },
+        {
+            "subject": "player-white",
+            "object": "key_move-57",
+            "turn": "turn-57",
+            "relationship": "MAKES_MOVE",
+            "context": "Another check from the Queen on c6."
+        },
+        {
+            "subject": "player-black",
+            "object": "key_move-58",
+            "turn": "turn-58",
+            "relationship": "MAKES_MOVE",
+            "context": "The king is forced to b8."
+        },
+        {
+            "subject": "player-white",
+            "object": "key_move-59",
+            "turn": "turn-59",
+            "relationship": "MAKES_MOVE",
+            "context": "White's bishop moves to f4, a brilliant preparatory move, cutting off all escape squares."
+        },
+        {
+            "subject": "player-black",
+            "object": "key_move-60",
+            "turn": "turn-60",
+            "relationship": "MAKES_MOVE",
+            "context": "Black pushes the h-pawn, a completely futile move."
+        },
+        {
+            "subject": "player-white",
+            "object": "key_move-61",
+            "turn": "turn-61",
+            "relationship": "MAKES_MOVE",
+            "context": "CHECKMATE! The white rook slides to d8, delivering the final blow."
+        },
+        {
+            "subject": "key_move-61",
+            "object": "game-outcome-checkmate",
+            "turn": "turn-61",
+            "relationship": "RESULTS_IN",
+            "context": "CHECKMATE!"
+        },
+        {
+            "subject": "game-outcome-checkmate",
+            "object": "game-outcome-white-wins",
+            "turn": "turn-61",
+            "relationship": "CONFIRMS",
+            "context": "Winner: White"
+        }
+    ]
+}
