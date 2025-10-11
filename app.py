@@ -253,4 +253,3 @@ elif game_selection == "Mancala":
 #--- ABOUT SECTION IN SIDEBAR-------------
 st.sidebar.header("About")
 st.sidebar.info("This is a collection of simple games built using Streamlit.")
-
