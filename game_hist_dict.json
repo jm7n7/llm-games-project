@@ -1,0 +1,66 @@
+{
+  "jl-chess": {
+    "game1": {
+      "winner": "jl-chess"
+    },
+    "game2": {
+      "winner": "jl-chess"
+    },
+    "game3": {
+      "winner": "jl-chess"
+    },
+    "game4": {
+      "winner": "jl-chess"
+    },
+    "game5": {
+      "winner": "jl-chess"
+    },
+    "game6": {
+      "winner": "jl-chess"
+    },
+    "game7": {
+      "winner": "jl-chess"
+    }
+  },
+  "player1": {},
+  "player2": {},
+  "player3": {},
+  "player5": {
+    "game1": {
+      "winner": "player5"
+    },
+    "game2": {
+      "winner": "player5"
+    },
+    "game3": {
+      "winner": "player5"
+    },
+    "game4": {
+      "winner": "player5"
+    },
+    "game5": {
+      "winner": "player5"
+    },
+    "game6": {
+      "winner": "player5"
+    },
+    "game7": {
+      "winner": "player5"
+    },
+    "game8": {
+      "winner": "player5"
+    },
+    "game9": {
+      "winner": "player5"
+    },
+    "game10": {
+      "winner": "player5"
+    },
+    "game11": {
+      "winner": "player5"
+    },
+    "game12": {
+      "winner": "player5"
+    }
+  }
+}

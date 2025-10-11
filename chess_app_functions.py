@@ -1,38 +1,16 @@
-# --- imports ----------
+import os
 import streamlit as st
-from chess_logic import ChessGame 
-from connect4 import play_four_in_a_row
-from scrabble import play_letter_tile_game
-from mancala import play_mancala
 from PIL import Image, ImageDraw, ImageFont
 from streamlit_image_coordinates import streamlit_image_coordinates
-import io
-import os
 
-# --- PAGE CONFIG --
-st.set_page_config(
-    page_title="Game Arcade",
-    layout="wide"
-)
-
-#--- APP TITLE AND HEADER------
-st.title("Game Arcade")
-
-#--- SIDEBAR FOR GAME SELECTION-------------
-st.sidebar.header("Choose a Game")
-game_selection = st.sidebar.radio(
-    "Select a game to play:",
-    ("Home", "Chess", "Four-in-a-row", "Letter-Tile-Game", "Mancala")
-)
-
-# --- CHESS HELPER FUNCTIONS ---
-@st.cache_data
 def load_piece_images():
     """Loads all piece images from the assets folder."""
     images = {}
+    # A simple check for the assets folder
+    if not os.path.exists("assets"):
+        return None
     for filename in os.listdir("assets"):
         if filename.endswith(".png"):
-            # Use the filename (e.g., "w_king.png") as the key
             images[filename] = Image.open(os.path.join("assets", filename)).convert("RGBA")
     return images
 
@@ -77,11 +55,9 @@ def draw_chess_board_pil(piece_images):
             draw.rectangle([x0, y0, x0 + SQUARE_SIZE, y0 + SQUARE_SIZE], fill=color)
 
             piece = board.get_piece((board_r, board_c))
-            if piece:
-                piece_img = piece_images.get(piece.image_name)
-                if piece_img:
-                    resized_img = piece_img.resize((SQUARE_SIZE, SQUARE_SIZE), Image.Resampling.LANCZOS)
-                    img.paste(resized_img, (x0, y0), resized_img)
+            if piece and piece.image_name in piece_images:
+                piece_img = piece_images[piece.image_name].resize((SQUARE_SIZE, SQUARE_SIZE), Image.Resampling.LANCZOS)
+                img.paste(piece_img, (x0, y0), piece_img)
 
     # --- Overlay for highlights (coordinates must be converted) ---
     overlay = Image.new("RGBA", img.size, (0,0,0,0))
@@ -106,7 +82,8 @@ def draw_chess_board_pil(piece_images):
         
         selected_piece = board.get_piece(st.session_state.selected_square)
         if selected_piece and selected_piece.color == game.turn:
-            valid_moves = [m for m in selected_piece.get_valid_moves(board) if not game.move_puts_king_in_check(st.session_state.selected_square, m)]
+            # Pass the 'game' object to get_valid_moves to check for en passant
+            valid_moves = [m for m in selected_piece.get_valid_moves(board, game) if not game.move_puts_king_in_check(st.session_state.selected_square, m)]
             for move_br, move_bc in valid_moves:
                 move_dr = 7 - move_br if player_color == 'black' else move_br
                 move_dc = 7 - move_bc if player_color == 'black' else move_bc
@@ -164,92 +141,3 @@ def handle_chess_click(coords):
         st.session_state.selected_square = pos
     else:
         st.session_state.selected_square = None
-
-#--- MAIN CONTENT AREA ROUTER -----------------------------------------------
-if game_selection == "Home":
-    st.header("Welcome to the Game Arcade!")
-    st.info("Select a game from the sidebar on the left to start playing.")
-    st.markdown("This app is a collection of classic board and word games built from scratch. Enjoy your stay!")
-
-elif game_selection == "Chess":
-    st.header("Chess")
-
-    if 'chess_game' not in st.session_state:
-        st.session_state.chess_game = ChessGame()
-        st.session_state.selected_square = None
-        st.session_state.last_click = None
-        st.session_state.chess_game_phase = 'color_selection'
-        st.session_state.player_color = 'white' # Default
-
-    # --- COLOR SELECTION PHASE ---
-    if st.session_state.get('chess_game_phase') == 'color_selection':
-        st.subheader("Choose Your Color")
-        c1, c2, c3 = st.columns([2,1,2])
-        with c2:
-            if st.button("Play as White", use_container_width=True):
-                st.session_state.player_color = 'white'
-                st.session_state.chess_game_phase = 'playing'
-                st.rerun()
-            if st.button("Play as Black", use_container_width=True):
-                st.session_state.player_color = 'black'
-                st.session_state.chess_game_phase = 'playing'
-                st.rerun()
-
-    # --- PLAYING PHASE ---
-    elif st.session_state.get('chess_game_phase') == 'playing':
-        try:
-            piece_images = load_piece_images()
-            if not piece_images:
-                 st.error("The `assets` folder is empty or does not exist. Please create it and add the required piece images.")
-                 st.stop()
-        except FileNotFoundError:
-            st.error("Could not find the `assets` folder. Please create it and add the piece images.")
-            st.stop()
-
-        game = st.session_state.chess_game
-        col1, col2 = st.columns([2, 1])
-        
-        with col1:
-            board_image = draw_chess_board_pil(piece_images)
-            value = streamlit_image_coordinates(board_image, key="chess_board")
-            
-            if value and value != st.session_state.get('last_click'):
-                st.session_state.last_click = value
-                handle_chess_click(value)
-                st.rerun()
-
-        with col2:
-            st.subheader("Game Info")
-            status_container = st.empty()
-            if game.game_over:
-                 status_container.success(game.status_message)
-            else:
-                 status_container.info(game.status_message)
-            
-            if st.button("New Game", use_container_width=True):
-                st.session_state.chess_game.reset_game()
-                st.session_state.selected_square = None
-                st.session_state.last_click = None
-                st.session_state.chess_game_phase = 'color_selection'
-                st.rerun()
-
-            st.subheader("Move History")
-            st.text_area(
-                "Moves", 
-                "\n".join(f"{i+1}. {move}" for i, move in enumerate(game.move_history)), 
-                height=400,
-                key="move_history"
-            )
-
-elif game_selection == "Four-in-a-row":
-    play_four_in_a_row()
-
-elif game_selection == "Letter-Tile-Game":
-    play_letter_tile_game()
-
-elif game_selection == "Mancala":
-    play_mancala()
-
-#--- ABOUT SECTION IN SIDEBAR-------------
-st.sidebar.header("About")
-st.sidebar.info("This is a collection of simple games built using Streamlit.")

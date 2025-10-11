@@ -1,0 +1,17 @@
+{
+  "jl-chess": {
+    "password": "jl-chess"
+  },
+  "player1": {
+    "password": "player1"
+  },
+  "player2": {
+    "password": "player2"
+  },
+  "player3": {
+    "password": "player3"
+  },
+  "player5": {
+    "password": "player5"
+  }
+}
