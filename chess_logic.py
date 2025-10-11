@@ -5,18 +5,14 @@ class Piece:
         self.position = position
         self.has_moved = False
         self.symbol = 'X' # Fallback symbol
-        # Generates filenames like 'w_king.png' or 'b_pawn.png'
         self.image_name = f"{self.color[0]}_{self.__class__.__name__.lower()}.png"
 
-    def get_valid_moves(self, board):
+    def get_valid_moves(self, board, game=None):
         """Returns a list of valid moves for the piece."""
         raise NotImplementedError
 
     def _is_valid_and_capturable(self, pos, board):
-        """
-        Helper to check if a position is on the board and can be moved to.
-        Returns (on_board, can_capture).
-        """
+        """Helper to check if a position is on the board and can be moved to."""
         r, c = pos
         if not (0 <= r < 8 and 0 <= c < 8):
             return False, False
@@ -33,16 +29,15 @@ class King(Piece):
         super().__init__(color, position)
         self.symbol = '♔' if color == 'white' else '♚'
 
-    def get_valid_moves(self, board):
+    def get_valid_moves(self, board, game=None):
         moves = []
         r, c = self.position
         for dr in [-1, 0, 1]:
             for dc in [-1, 0, 1]:
                 if dr == 0 and dc == 0:
                     continue
-                
                 new_pos = (r + dr, c + dc)
-                is_valid, can_capture = self._is_valid_and_capturable(new_pos, board)
+                is_valid, _ = self._is_valid_and_capturable(new_pos, board)
                 if is_valid:
                     moves.append(new_pos)
         return moves
@@ -52,8 +47,7 @@ class Queen(Piece):
         super().__init__(color, position)
         self.symbol = '♕' if color == 'white' else '♛'
 
-    def get_valid_moves(self, board):
-        # Combines Rook and Bishop logic
+    def get_valid_moves(self, board, game=None):
         moves = []
         r, c = self.position
         directions = [(-1, -1), (-1, 1), (1, -1), (1, 1), (-1, 0), (1, 0), (0, -1), (0, 1)]
@@ -64,9 +58,9 @@ class Queen(Piece):
                 if is_valid:
                     moves.append(new_pos)
                     if can_capture:
-                        break # Stop after capturing
+                        break
                 else:
-                    break # Stop if blocked or off-board
+                    break
         return moves
 
 class Rook(Piece):
@@ -74,7 +68,7 @@ class Rook(Piece):
         super().__init__(color, position)
         self.symbol = '♖' if color == 'white' else '♜'
 
-    def get_valid_moves(self, board):
+    def get_valid_moves(self, board, game=None):
         moves = []
         r, c = self.position
         directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
@@ -95,7 +89,7 @@ class Bishop(Piece):
         super().__init__(color, position)
         self.symbol = '♗' if color == 'white' else '♝'
 
-    def get_valid_moves(self, board):
+    def get_valid_moves(self, board, game=None):
         moves = []
         r, c = self.position
         directions = [(-1, -1), (-1, 1), (1, -1), (1, 1)]
@@ -116,7 +110,7 @@ class Knight(Piece):
         super().__init__(color, position)
         self.symbol = '♘' if color == 'white' else '♞'
 
-    def get_valid_moves(self, board):
+    def get_valid_moves(self, board, game=None):
         moves = []
         r, c = self.position
         potential_moves = [
@@ -134,23 +128,19 @@ class Pawn(Piece):
         super().__init__(color, position)
         self.symbol = '♙' if color == 'white' else '♟'
 
-    def get_valid_moves(self, board):
+    def get_valid_moves(self, board, game=None):
         moves = []
         r, c = self.position
         direction = -1 if self.color == 'white' else 1
 
-        # 1. Standard one-step move
         one_step = (r + direction, c)
         if 0 <= one_step[0] < 8 and board.get_piece(one_step) is None:
             moves.append(one_step)
-
-            # 2. Initial two-step move
             if not self.has_moved:
                 two_steps = (r + 2 * direction, c)
                 if 0 <= two_steps[0] < 8 and board.get_piece(two_steps) is None:
                     moves.append(two_steps)
         
-        # 3. Captures
         for dc in [-1, 1]:
             capture_pos = (r + direction, c + dc)
             if 0 <= capture_pos[0] < 8 and 0 <= capture_pos[1] < 8:
@@ -158,9 +148,10 @@ class Pawn(Piece):
                 if target_piece and target_piece.color != self.color:
                     moves.append(capture_pos)
         
-        # TODO: En passant and promotion
+        if game and game.en_passant_target and game.en_passant_target == (r + direction, c - 1) or \
+           game and game.en_passant_target and game.en_passant_target == (r + direction, c + 1):
+            moves.append(game.en_passant_target)
         return moves
-
 
 class Board:
     """Represents the chessboard and its pieces."""
@@ -181,9 +172,7 @@ class Board:
     def move_piece(self, start_pos, end_pos):
         piece = self.get_piece(start_pos)
         if piece:
-            # Handle capture
             captured_piece = self.get_piece(end_pos)
-            
             self.set_piece(end_pos, piece)
             self.set_piece(start_pos, None)
             piece.has_moved = True
@@ -191,7 +180,6 @@ class Board:
         return None
     
     def find_king(self, color):
-        """Finds the position of the king for a given color."""
         for r in range(8):
             for c in range(8):
                 piece = self.get_piece((r, c))
@@ -200,18 +188,9 @@ class Board:
         return None
 
     def setup_pieces(self):
-        # Place major pieces
         for r, color in [(0, 'black'), (7, 'white')]:
-            self.set_piece((r, 0), Rook(color, (r, 0)))
-            self.set_piece((r, 7), Rook(color, (r, 7)))
-            self.set_piece((r, 1), Knight(color, (r, 1)))
-            self.set_piece((r, 6), Knight(color, (r, 6)))
-            self.set_piece((r, 2), Bishop(color, (r, 2)))
-            self.set_piece((r, 5), Bishop(color, (r, 5)))
-            self.set_piece((r, 3), Queen(color, (r, 3)))
-            self.set_piece((r, 4), King(color, (r, 4)))
-        
-        # Place pawns
+            for c, P in [(0, Rook), (1, Knight), (2, Bishop), (3, Queen), (4, King), (5, Bishop), (6, Knight), (7, Rook)]:
+                self.set_piece((r, c), P(color, (r, c)))
         for c in range(8):
             self.set_piece((1, c), Pawn('black', (1, c)))
             self.set_piece((6, c), Pawn('white', (6, c)))
@@ -227,35 +206,67 @@ class ChessGame:
         self.game_over = False
         self.status_message = "White's turn."
         self.move_history = []
-    
+        self.promotion_pending = None
+        self.en_passant_target = None
+        self.position_history = {}
+        self._record_position()
+
     def pos_to_notation(self, pos):
         r, c = pos
         return f"{'abcdefgh'[c]}{8-r}"
 
-    def make_move(self, start_pos, end_pos):
-        piece = self.board.get_piece(start_pos)
-        if not piece or piece.color != self.turn or self.game_over:
-            return False, "Not your turn or no piece selected."
-
-        valid_moves = piece.get_valid_moves(self.board)
-        if end_pos not in valid_moves:
-            return False, "Invalid move for this piece."
-
-        if self.move_puts_king_in_check(start_pos, end_pos):
-            return False, "You cannot move into check."
+    def _get_board_state_string(self):
+        """Generates a unique string for the current board state."""
+        state_parts = []
+        for r in range(8):
+            empty_count = 0
+            for c in range(8):
+                piece = self.board.get_piece((r, c))
+                if piece:
+                    if empty_count > 0:
+                        state_parts.append(str(empty_count))
+                        empty_count = 0
+                    state_parts.append(piece.symbol)
+                else:
+                    empty_count += 1
+            if empty_count > 0:
+                state_parts.append(str(empty_count))
+            state_parts.append('/')
         
-        captured_piece = self.board.move_piece(start_pos, end_pos)
+        state_string = "".join(state_parts)
+        state_string += f" {self.turn[0]}"
+        state_string += f" {self.en_passant_target if self.en_passant_target else '-'}"
+        return state_string
+    
+    def _record_position(self):
+        """Records the current board state for repetition checks."""
+        state_key = self._get_board_state_string()
+        self.position_history[state_key] = self.position_history.get(state_key, 0) + 1
 
-        # Log move
-        move_notation = f"{piece.symbol} {self.pos_to_notation(start_pos)}-{self.pos_to_notation(end_pos)}"
-        if captured_piece:
-             move_notation += f" (captures {captured_piece.symbol})"
-        self.move_history.append(move_notation)
-
-        # Switch turns
-        self.turn = 'black' if self.turn == 'white' else 'white'
+    def _check_insufficient_material(self):
+        """Checks for draw conditions due to insufficient material."""
+        pieces = [p for row in self.board.grid for p in row if p]
         
-        # Update game status
+        # King vs King
+        if len(pieces) == 2: return True
+
+        # King and Knight vs King OR King and Bishop vs King
+        if len(pieces) == 3:
+            if any(isinstance(p, (Knight, Bishop)) for p in pieces):
+                return True
+
+        # King and Bishop vs King and Bishop (bishops on same color squares)
+        if len(pieces) == 4:
+            bishops = [p for p in pieces if isinstance(p, Bishop)]
+            if len(bishops) == 2:
+                b1_r, b1_c = bishops[0].position
+                b2_r, b2_c = bishops[1].position
+                if (b1_r + b1_c) % 2 == (b2_r + b2_c) % 2:
+                    return True
+        return False
+
+    def _update_game_status(self):
+        """Internal method to update the game status after a move."""
         if self.is_checkmate(self.turn):
             self.game_over = True
             winner = 'White' if self.turn == 'black' else 'Black'
@@ -263,12 +274,89 @@ class ChessGame:
         elif self.is_stalemate(self.turn):
             self.game_over = True
             self.status_message = "Stalemate! The game is a draw."
+        elif self.position_history.get(self._get_board_state_string(), 0) >= 5:
+            self.game_over = True
+            self.status_message = "Draw by fivefold repetition."
+        elif self._check_insufficient_material():
+            self.game_over = True
+            self.status_message = "Draw by insufficient material."
         elif self.is_in_check(self.turn):
              self.status_message = f"{self.turn.capitalize()}'s turn (in check)."
         else:
             self.status_message = f"{self.turn.capitalize()}'s turn."
 
+    def make_move(self, start_pos, end_pos):
+        piece = self.board.get_piece(start_pos)
+        if not piece or piece.color != self.turn or self.game_over:
+            return False, "Not your turn or no piece selected."
+
+        valid_moves = piece.get_valid_moves(self.board, self)
+        if end_pos not in valid_moves:
+            return False, "Invalid move for this piece."
+
+        if self.move_puts_king_in_check(start_pos, end_pos):
+            return False, "You cannot move into check."
+
+        is_en_passant = isinstance(piece, Pawn) and end_pos == self.en_passant_target
+        captured_piece = None
+        
+        if is_en_passant:
+            pawn_dir = -1 if piece.color == 'white' else 1
+            captured_pawn_pos = (end_pos[0] - pawn_dir, end_pos[1])
+            captured_piece = self.board.get_piece(captured_pawn_pos)
+            self.board.set_piece(captured_pawn_pos, None)
+            self.board.move_piece(start_pos, end_pos)
+        else:
+            captured_piece = self.board.move_piece(start_pos, end_pos)
+
+        if isinstance(piece, Pawn) and abs(start_pos[0] - end_pos[0]) == 2:
+            self.en_passant_target = ((start_pos[0] + end_pos[0]) // 2, start_pos[1])
+        else:
+            self.en_passant_target = None
+        
+        if isinstance(piece, Pawn) and end_pos[0] in [0, 7]:
+            self.promotion_pending = (start_pos, end_pos)
+            self.status_message = f"{self.turn.capitalize()} to promote pawn. Choose a piece."
+            return True, "Promotion"
+        
+        move_notation = f"{piece.symbol} {self.pos_to_notation(start_pos)}-{self.pos_to_notation(end_pos)}"
+        if captured_piece:
+             move_notation += f" (captures {captured_piece.symbol})"
+        if is_en_passant:
+            move_notation += " e.p."
+        self.move_history.append(move_notation)
+
+        self.turn = 'black' if self.turn == 'white' else 'white'
+        self._record_position()
+        self._update_game_status()
+
         return True, self.status_message
+
+    def promote_pawn(self, piece_choice_str):
+        if not self.promotion_pending:
+            return False, "No pawn is pending promotion."
+
+        _, end_pos = self.promotion_pending
+        pawn_color = self.turn
+        
+        piece_map = {'Queen': Queen, 'Rook': Rook, 'Bishop': Bishop, 'Knight': Knight}
+        new_piece_class = piece_map.get(piece_choice_str)
+        
+        if not new_piece_class:
+            return False, "Invalid piece choice."
+            
+        new_piece = new_piece_class(pawn_color, end_pos)
+        self.board.set_piece(end_pos, new_piece)
+
+        self.promotion_pending = None
+        move_notation = f"{self.pos_to_notation(end_pos)}={new_piece.symbol}"
+        self.move_history.append(move_notation)
+
+        self.turn = 'black' if self.turn == 'white' else 'white'
+        self._record_position()
+        self._update_game_status()
+        return True, "Pawn promoted successfully."
+
 
     def is_in_check(self, color):
         king_pos = self.board.find_king(color)
@@ -279,45 +367,46 @@ class ChessGame:
             for c in range(8):
                 piece = self.board.get_piece((r, c))
                 if piece and piece.color == opponent_color:
-                    # Need to check valid moves from the opponent's perspective
-                    # A simple 'in' check is not sufficient for pawns
-                    if king_pos in piece.get_valid_moves(self.board):
+                    if king_pos in piece.get_valid_moves(self.board, self):
                         return True
         return False
 
     def move_puts_king_in_check(self, start_pos, end_pos):
-        """Simulates a move and checks if it results in the king being in check."""
         original_piece = self.board.get_piece(start_pos)
         if not original_piece: return False
         
-        # Temporarily make the move
         captured_piece = self.board.get_piece(end_pos)
-        
-        # Special handling for piece's internal position state
         original_start_pos = original_piece.position
         
+        is_en_passant = isinstance(original_piece, Pawn) and end_pos == self.en_passant_target
+        captured_pawn_pos, en_passant_captured_piece = None, None
+
+        if is_en_passant:
+            pawn_dir = -1 if original_piece.color == 'white' else 1
+            captured_pawn_pos = (end_pos[0] - pawn_dir, end_pos[1])
+            en_passant_captured_piece = self.board.get_piece(captured_pawn_pos)
+            self.board.set_piece(captured_pawn_pos, None)
+
         self.board.set_piece(end_pos, original_piece)
         self.board.set_piece(start_pos, None)
 
-        # Check for check
         in_check = self.is_in_check(original_piece.color)
         
-        # Undo the move
         self.board.set_piece(start_pos, original_piece)
         self.board.set_piece(end_pos, captured_piece)
-        
-        # Restore piece's internal position state
         original_piece.position = original_start_pos
+
+        if is_en_passant and captured_pawn_pos:
+            self.board.set_piece(captured_pawn_pos, en_passant_captured_piece)
 
         return in_check
 
     def has_legal_moves(self, color):
-        """Checks if a player has any legal moves."""
         for r in range(8):
             for c in range(8):
                 piece = self.board.get_piece((r, c))
                 if piece and piece.color == color:
-                    for move in piece.get_valid_moves(self.board):
+                    for move in piece.get_valid_moves(self.board, self):
                         if not self.move_puts_king_in_check((r, c), move):
                             return True
         return False
@@ -327,5 +416,4 @@ class ChessGame:
 
     def is_stalemate(self, color):
         return not self.is_in_check(color) and not self.has_legal_moves(color)
-
 
