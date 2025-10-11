@@ -1,7 +1,6 @@
 #--- imports----------
-import io
-import os
 import streamlit as st
+import pandas as pd
 from chess_logic import ChessGame 
 from connect4 import play_four_in_a_row
 from scrabble import play_letter_tile_game
@@ -9,6 +8,8 @@ from mancala import play_mancala
 from PIL import Image, ImageDraw, ImageFont
 from streamlit_image_coordinates import streamlit_image_coordinates
 from chess_app_functions import *
+import io
+import os
 
 #--- PAGE CONFIG --
 st.set_page_config(
@@ -105,9 +106,16 @@ elif game_selection == "Chess":
             st.text_area(
                 "Moves", 
                 "\n".join(f"{i+1}. {move}" for i, move in enumerate(game.move_history)), 
-                height=400,
+                height=300,
                 key="move_history"
             )
+
+            # --- Display Game Data on Game Over ---
+            if game.game_over and game.game_data:
+                st.subheader("Game Data Log")
+                df = pd.DataFrame(game.game_data)
+                st.dataframe(df)
+
 
 elif game_selection == "Four-in-a-row":
     play_four_in_a_row()
@@ -121,3 +129,4 @@ elif game_selection == "Mancala":
 #--- ABOUT SECTION IN SIDEBAR-------------
 st.sidebar.header("About")
 st.sidebar.info("This is a collection of simple games built using Streamlit.")
+
