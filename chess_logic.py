@@ -1,10 +1,13 @@
+import uuid
+
 class Piece:
     """Base class for all chess pieces."""
-    def __init__(self, color, position):
+    def __init__(self, color, position, name=None):
         self.color = color
         self.position = position
         self.has_moved = False
         self.symbol = 'X' # Fallback symbol
+        self.name = name if name else self.__class__.__name__
         self.image_name = f"{self.color[0]}_{self.__class__.__name__.lower()}.png"
 
     def get_valid_moves(self, board, game=None):
@@ -25,8 +28,8 @@ class Piece:
         return False, False # Blocked by own piece
 
 class King(Piece):
-    def __init__(self, color, position):
-        super().__init__(color, position)
+    def __init__(self, color, position, name=None):
+        super().__init__(color, position, name or "King")
         self.symbol = '♔' if color == 'white' else '♚'
 
     def get_valid_moves(self, board, game=None):
@@ -43,8 +46,8 @@ class King(Piece):
         return moves
 
 class Queen(Piece):
-    def __init__(self, color, position):
-        super().__init__(color, position)
+    def __init__(self, color, position, name=None):
+        super().__init__(color, position, name or "Queen")
         self.symbol = '♕' if color == 'white' else '♛'
 
     def get_valid_moves(self, board, game=None):
@@ -64,8 +67,8 @@ class Queen(Piece):
         return moves
 
 class Rook(Piece):
-    def __init__(self, color, position):
-        super().__init__(color, position)
+    def __init__(self, color, position, name=None):
+        super().__init__(color, position, name)
         self.symbol = '♖' if color == 'white' else '♜'
 
     def get_valid_moves(self, board, game=None):
@@ -85,8 +88,8 @@ class Rook(Piece):
         return moves
 
 class Bishop(Piece):
-    def __init__(self, color, position):
-        super().__init__(color, position)
+    def __init__(self, color, position, name=None):
+        super().__init__(color, position, name)
         self.symbol = '♗' if color == 'white' else '♝'
 
     def get_valid_moves(self, board, game=None):
@@ -106,8 +109,8 @@ class Bishop(Piece):
         return moves
 
 class Knight(Piece):
-    def __init__(self, color, position):
-        super().__init__(color, position)
+    def __init__(self, color, position, name=None):
+        super().__init__(color, position, name)
         self.symbol = '♘' if color == 'white' else '♞'
 
     def get_valid_moves(self, board, game=None):
@@ -124,8 +127,8 @@ class Knight(Piece):
         return moves
 
 class Pawn(Piece):
-    def __init__(self, color, position):
-        super().__init__(color, position)
+    def __init__(self, color, position, name=None):
+        super().__init__(color, position, name)
         self.symbol = '♙' if color == 'white' else '♟'
 
     def get_valid_moves(self, board, game=None):
@@ -148,8 +151,8 @@ class Pawn(Piece):
                 if target_piece and target_piece.color != self.color:
                     moves.append(capture_pos)
         
-        if game and game.en_passant_target and game.en_passant_target == (r + direction, c - 1) or \
-           game and game.en_passant_target and game.en_passant_target == (r + direction, c + 1):
+        if game and game.en_passant_target and (game.en_passant_target == (r + direction, c - 1) or \
+           game.en_passant_target == (r + direction, c + 1)):
             moves.append(game.en_passant_target)
         return moves
 
@@ -188,12 +191,23 @@ class Board:
         return None
 
     def setup_pieces(self):
+        # Place major pieces with specific names
         for r, color in [(0, 'black'), (7, 'white')]:
-            for c, P in [(0, Rook), (1, Knight), (2, Bishop), (3, Queen), (4, King), (5, Bishop), (6, Knight), (7, Rook)]:
-                self.set_piece((r, c), P(color, (r, c)))
+            self.set_piece((r, 0), Rook(color, (r, 0), name="Q_rook"))
+            self.set_piece((r, 7), Rook(color, (r, 7), name="K_rook"))
+            self.set_piece((r, 1), Knight(color, (r, 1), name="Q_knight"))
+            self.set_piece((r, 6), Knight(color, (r, 6), name="K_knight"))
+            self.set_piece((r, 2), Bishop(color, (r, 2), name="Q_bishop"))
+            self.set_piece((r, 5), Bishop(color, (r, 5), name="K_bishop"))
+            self.set_piece((r, 3), Queen(color, (r, 3)))
+            self.set_piece((r, 4), King(color, (r, 4)))
+        
+        # Place pawns with specific names
+        files = "abcdefgh"
         for c in range(8):
-            self.set_piece((1, c), Pawn('black', (1, c)))
-            self.set_piece((6, c), Pawn('white', (6, c)))
+            self.set_piece((1, c), Pawn('black', (1, c), name=f"{files[c]}_pawn"))
+            self.set_piece((6, c), Pawn('white', (6, c), name=f"{files[c]}_pawn"))
+
 
 class ChessGame:
     """Manages the state and logic of a chess game."""
@@ -209,6 +223,8 @@ class ChessGame:
         self.promotion_pending = None
         self.en_passant_target = None
         self.position_history = {}
+        self.game_id = f"chs-{uuid.uuid4()}"
+        self.game_data = []
         self._record_position()
 
     def pos_to_notation(self, pos):
@@ -243,26 +259,40 @@ class ChessGame:
         state_key = self._get_board_state_string()
         self.position_history[state_key] = self.position_history.get(state_key, 0) + 1
 
+    def _record_move_data(self, piece, start_pos, end_pos, captured_piece, promoted_into=None):
+        """Records the details of a single move into the game_data list."""
+        opponent_color = 'black' if piece.color == 'white' else 'white'
+        move_data = {
+            'game_id': self.game_id,
+            'turn': len(self.game_data) + 1,
+            'color': piece.color,
+            'piece_moved': piece.name,
+            'start_square': self.pos_to_notation(start_pos),
+            'end_square': self.pos_to_notation(end_pos),
+            'capture': 1 if captured_piece else 0,
+            'captured_piece': captured_piece.name if captured_piece else 'NA',
+            'check': 1 if self.is_in_check(opponent_color) else 0,
+            'checkmate': 1 if self.is_checkmate(opponent_color) else 0,
+            'promoted': 1 if promoted_into else 0,
+            'promoted_into': promoted_into if promoted_into else 'NA',
+            'draw': 1 if "draw" in self.status_message.lower() else 0,
+        }
+        self.game_data.append(move_data)
+
     def _check_insufficient_material(self):
         """Checks for draw conditions due to insufficient material."""
         pieces = [p for row in self.board.grid for p in row if p]
         
-        # King vs King
-        if len(pieces) == 2: return True
-
-        # King and Knight vs King OR King and Bishop vs King
-        if len(pieces) == 3:
-            if any(isinstance(p, (Knight, Bishop)) for p in pieces):
-                return True
-
-        # King and Bishop vs King and Bishop (bishops on same color squares)
+        if len(pieces) == 2: return True # King vs King
+        if len(pieces) == 3 and any(isinstance(p, (Knight, Bishop)) for p in pieces):
+            return True # King & Knight vs King OR King & Bishop vs King
         if len(pieces) == 4:
             bishops = [p for p in pieces if isinstance(p, Bishop)]
             if len(bishops) == 2:
                 b1_r, b1_c = bishops[0].position
                 b2_r, b2_c = bishops[1].position
                 if (b1_r + b1_c) % 2 == (b2_r + b2_c) % 2:
-                    return True
+                    return True # King & Bishop vs King & Bishop on same color
         return False
 
     def _update_game_status(self):
@@ -297,6 +327,12 @@ class ChessGame:
         if self.move_puts_king_in_check(start_pos, end_pos):
             return False, "You cannot move into check."
 
+        if isinstance(piece, Pawn) and end_pos[0] in [0, 7]:
+            captured_piece = self.board.get_piece(end_pos)
+            self.promotion_pending = (start_pos, end_pos, captured_piece, piece) # Pass the pawn object
+            self.status_message = f"{self.turn.capitalize()} to promote pawn. Choose a piece."
+            return True, "Promotion"
+
         is_en_passant = isinstance(piece, Pawn) and end_pos == self.en_passant_target
         captured_piece = None
         
@@ -314,11 +350,6 @@ class ChessGame:
         else:
             self.en_passant_target = None
         
-        if isinstance(piece, Pawn) and end_pos[0] in [0, 7]:
-            self.promotion_pending = (start_pos, end_pos)
-            self.status_message = f"{self.turn.capitalize()} to promote pawn. Choose a piece."
-            return True, "Promotion"
-        
         move_notation = f"{piece.symbol} {self.pos_to_notation(start_pos)}-{self.pos_to_notation(end_pos)}"
         if captured_piece:
              move_notation += f" (captures {captured_piece.symbol})"
@@ -329,6 +360,7 @@ class ChessGame:
         self.turn = 'black' if self.turn == 'white' else 'white'
         self._record_position()
         self._update_game_status()
+        self._record_move_data(piece, start_pos, end_pos, captured_piece)
 
         return True, self.status_message
 
@@ -336,7 +368,7 @@ class ChessGame:
         if not self.promotion_pending:
             return False, "No pawn is pending promotion."
 
-        _, end_pos = self.promotion_pending
+        start_pos, end_pos, captured_piece, original_pawn = self.promotion_pending
         pawn_color = self.turn
         
         piece_map = {'Queen': Queen, 'Rook': Rook, 'Bishop': Bishop, 'Knight': Knight}
@@ -345,7 +377,9 @@ class ChessGame:
         if not new_piece_class:
             return False, "Invalid piece choice."
             
+        # The new promoted piece does not get a special name, just its class name
         new_piece = new_piece_class(pawn_color, end_pos)
+        self.board.set_piece(start_pos, None)
         self.board.set_piece(end_pos, new_piece)
 
         self.promotion_pending = None
@@ -355,6 +389,9 @@ class ChessGame:
         self.turn = 'black' if self.turn == 'white' else 'white'
         self._record_position()
         self._update_game_status()
+        
+        self._record_move_data(original_pawn, start_pos, end_pos, captured_piece, promoted_into=piece_choice_str)
+        
         return True, "Pawn promoted successfully."
 
 
