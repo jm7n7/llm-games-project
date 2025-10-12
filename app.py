@@ -35,43 +35,68 @@ if game_selection == "Home":
 elif game_selection == "Chess":
     st.header("Chess")
 
+    # --- API KEY CHECK ---
+    if 'GOOGLE_API_KEY' not in os.environ:
+        st.error("Your Google AI API key is not configured. Please set the GOOGLE_API_KEY environment variable to play against the AI.")
+        st.stop()
+
+    # --- INITIALIZATION ---
     if 'chess_game' not in st.session_state:
         st.session_state.chess_game = ChessGame()
         st.session_state.selected_square = None
         st.session_state.last_click = None
         st.session_state.chess_game_phase = 'color_selection'
         st.session_state.player_color = 'white'
+        st.session_state.ai_color = 'black'
 
+    game = st.session_state.chess_game
+
+    # --- GAME PHASES ---
     if st.session_state.get('chess_game_phase') == 'color_selection':
         st.subheader("Choose Your Color")
+        st.write("You will play against Coach Gemini.")
         c1, c2, c3 = st.columns([2,1,2])
         with c2:
             if st.button("Play as White", use_container_width=True):
                 st.session_state.player_color = 'white'
+                st.session_state.ai_color = 'black'
                 st.session_state.chess_game_phase = 'playing'
                 st.rerun()
             if st.button("Play as Black", use_container_width=True):
                 st.session_state.player_color = 'black'
+                st.session_state.ai_color = 'white'
                 st.session_state.chess_game_phase = 'playing'
                 st.rerun()
 
     elif st.session_state.get('chess_game_phase') == 'playing':
+        # AI moves first if it's White
+        if game.turn == st.session_state.ai_color and len(game.move_history) == 0:
+            with st.spinner("Coach Gemini is thinking..."):
+                game.request_ai_move()
+            st.rerun()
+
+        # --- Main game layout ---
         piece_images = load_piece_images()
         if piece_images is None or not piece_images:
             st.error("Could not find the `assets` folder or it is empty. Please create it and add the required chess piece images (e.g., 'w_king.png').")
             st.stop()
-
-        game = st.session_state.chess_game
+            
         col1, col2 = st.columns([2, 1])
         
         with col1:
             board_image = draw_chess_board_pil(piece_images)
             value = streamlit_image_coordinates(board_image, key="chess_board")
             
+            # --- HUMAN TURN ---
             if value and value != st.session_state.get('last_click'):
                 st.session_state.last_click = value
-                if not game.promotion_pending: # Prevent clicks during promotion
+                if not game.promotion_pending and game.turn == st.session_state.player_color:
                     handle_chess_click(value)
+                    
+                    # --- AI TURN TRIGGER ---
+                    if not game.game_over and game.turn == st.session_state.ai_color:
+                        with st.spinner("Coach Gemini is thinking..."):
+                            game.request_ai_move()
                     st.rerun()
 
         with col2:
@@ -86,6 +111,10 @@ elif game_selection == "Chess":
                     with promo_cols[i]:
                         if st.button(choice, key=f"promo_{choice}", use_container_width=True):
                             game.promote_pawn(choice)
+                            # --- AI TURN TRIGGER AFTER PROMOTION ---
+                            if not game.game_over and game.turn == st.session_state.ai_color:
+                                with st.spinner("Coach Gemini is thinking..."):
+                                    game.request_ai_move()
                             st.session_state.last_click = None
                             st.rerun()
             else:
@@ -110,12 +139,10 @@ elif game_selection == "Chess":
                 key="move_history"
             )
 
-            # --- Display Game Data on Game Over ---
             if game.game_over and game.game_data:
                 st.subheader("Game Data Log")
                 df = pd.DataFrame(game.game_data)
                 st.dataframe(df)
-
 
 elif game_selection == "Four-in-a-row":
     play_four_in_a_row()

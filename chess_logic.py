@@ -1,4 +1,5 @@
 import uuid
+import chess_llm_functions as llm_api
 
 class Piece:
     """Base class for all chess pieces."""
@@ -13,6 +14,10 @@ class Piece:
     def get_valid_moves(self, board, game=None):
         """Returns a list of valid moves for the piece."""
         raise NotImplementedError
+
+    def get_attack_squares(self, board):
+        """Returns squares this piece is attacking. For most pieces, this is the same as valid moves."""
+        return self.get_valid_moves(board, None) # Pass None to avoid recursion in king's castling
 
     def _is_valid_and_capturable(self, pos, board):
         """Helper to check if a position is on the board and can be moved to."""
@@ -32,7 +37,56 @@ class King(Piece):
         super().__init__(color, position, name or "King")
         self.symbol = '♔' if color == 'white' else '♚'
 
+    def _get_castling_moves(self, board, game):
+        """Returns valid castling moves for the king."""
+        castling_moves = []
+        if self.has_moved or game.is_in_check(self.color):
+            return []
+
+        king_row, _ = self.position
+        
+        # Kingside castling
+        rook_k = board.get_piece((king_row, 7))
+        if isinstance(rook_k, Rook) and not rook_k.has_moved:
+            if board.get_piece((king_row, 5)) is None and \
+               board.get_piece((king_row, 6)) is None:
+                if not game.is_square_attacked((king_row, 5), 'black' if self.color == 'white' else 'white') and \
+                   not game.is_square_attacked((king_row, 6), 'black' if self.color == 'white' else 'white'):
+                    castling_moves.append((king_row, 6))
+
+        # Queenside castling
+        rook_q = board.get_piece((king_row, 0))
+        if isinstance(rook_q, Rook) and not rook_q.has_moved:
+            if board.get_piece((king_row, 1)) is None and \
+               board.get_piece((king_row, 2)) is None and \
+               board.get_piece((king_row, 3)) is None:
+                if not game.is_square_attacked((king_row, 2), 'black' if self.color == 'white' else 'white') and \
+                   not game.is_square_attacked((king_row, 3), 'black' if self.color == 'white' else 'white'):
+                    castling_moves.append((king_row, 2))
+        
+        return castling_moves
+
     def get_valid_moves(self, board, game=None):
+        moves = []
+        r, c = self.position
+        # Standard moves
+        for dr in [-1, 0, 1]:
+            for dc in [-1, 0, 1]:
+                if dr == 0 and dc == 0:
+                    continue
+                new_pos = (r + dr, c + dc)
+                is_valid, _ = self._is_valid_and_capturable(new_pos, board)
+                if is_valid:
+                    moves.append(new_pos)
+        
+        # Castling moves
+        if game:
+            moves.extend(self._get_castling_moves(board, game))
+            
+        return moves
+    
+    def get_attack_squares(self, board):
+        """For the King, attack squares do not include castling."""
         moves = []
         r, c = self.position
         for dr in [-1, 0, 1]:
@@ -44,6 +98,7 @@ class King(Piece):
                 if is_valid:
                     moves.append(new_pos)
         return moves
+
 
 class Queen(Piece):
     def __init__(self, color, position, name=None):
@@ -156,6 +211,18 @@ class Pawn(Piece):
             moves.append(game.en_passant_target)
         return moves
 
+    def get_attack_squares(self, board):
+        """For Pawns, attack squares are only the diagonal captures."""
+        moves = []
+        r, c = self.position
+        direction = -1 if self.color == 'white' else 1
+        for dc in [-1, 1]:
+            capture_pos = (r + direction, c + dc)
+            if 0 <= capture_pos[0] < 8 and 0 <= capture_pos[1] < 8:
+                moves.append(capture_pos)
+        return moves
+
+
 class Board:
     """Represents the chessboard and its pieces."""
     def __init__(self):
@@ -164,7 +231,9 @@ class Board:
 
     def get_piece(self, pos):
         r, c = pos
-        return self.grid[r][c]
+        if 0 <= r < 8 and 0 <= c < 8:
+            return self.grid[r][c]
+        return None
 
     def set_piece(self, pos, piece):
         r, c = pos
@@ -226,6 +295,9 @@ class ChessGame:
         self.game_id = f"chs-{uuid.uuid4()}"
         self.game_data = []
         self._record_position()
+        # --- ATTRIBUTES FOR AI COACH ---
+        self.coach_chat_session = llm_api.initialize_coach_chat()
+        self.last_coach_commentary = ""
 
     def pos_to_notation(self, pos):
         r, c = pos
@@ -315,6 +387,76 @@ class ChessGame:
         else:
             self.status_message = f"{self.turn.capitalize()}'s turn."
 
+    def is_square_attacked(self, pos, attacker_color):
+        """Checks if a given square is under attack by any of the opponent's pieces."""
+        for r in range(8):
+            for c in range(8):
+                piece = self.board.get_piece((r, c))
+                if piece and piece.color == attacker_color:
+                    if pos in piece.get_attack_squares(self.board):
+                        return True
+        return False
+
+    def _get_all_legal_moves(self, color):
+        """Generates a list of all legal moves for a given color in notation format."""
+        all_moves = []
+        for r in range(8):
+            for c in range(8):
+                piece = self.board.get_piece((r, c))
+                if piece and piece.color == color:
+                    start_pos = (r, c)
+                    valid_moves = piece.get_valid_moves(self.board, self)
+                    for end_pos in valid_moves:
+                        if not self.move_puts_king_in_check(start_pos, end_pos):
+                            all_moves.append(f"{self.pos_to_notation(start_pos)}-{self.pos_to_notation(end_pos)}")
+        return all_moves
+
+    def _notation_to_pos_tuple(self, notation):
+        """Converts algebraic notation (e.g., 'e4') to a (row, col) tuple."""
+        if not notation or len(notation) != 2: return None
+        files, rank = "abcdefgh", notation[1]
+        if notation[0] not in files or not rank.isdigit(): return None
+        return (8 - int(rank), files.index(notation[0]))
+
+    def request_ai_move(self):
+        """Orchestrates the two-LLM pipeline to get and make the AI's move."""
+        if self.game_over: return
+
+        # 1. Get Commentary on Player's Last Move (optional step, for now just for debug)
+        if self.game_data:
+            commentary = llm_api.get_move_commentary(self.game_data[-1])
+            print(f"Commentator: {commentary}")
+        
+        # 2. Prepare data for the Coach LLM
+        game_history_str = "\n".join([str(move) for move in self.game_data])
+        legal_moves = self._get_all_legal_moves(self.turn)
+
+        if not legal_moves: return 
+
+        # 3. Call the Coach LLM
+        coach_response = llm_api.get_coach_move_and_commentary(
+            self.coach_chat_session, game_history_str, legal_moves)
+
+        print(f"Coach: {coach_response}")
+
+        # 4. Parse and Execute the Move
+        if coach_response and 'move' in coach_response and 'commentary' in coach_response:
+            self.last_coach_commentary = coach_response['commentary']
+            move_str = coach_response['move']
+            
+            if move_str in legal_moves:
+                start_notation, end_notation = move_str.split('-')
+                start_pos = self._notation_to_pos_tuple(start_notation)
+                end_pos = self._notation_to_pos_tuple(end_notation)
+                if start_pos and end_pos:
+                    self.make_move(start_pos, end_pos)
+            else:
+                print(f"Error: AI returned an illegal move: {move_str}. Making a default move.")
+                default_move = legal_moves[0]
+                start_pos = self._notation_to_pos_tuple(default_move.split('-')[0])
+                end_pos = self._notation_to_pos_tuple(default_move.split('-')[1])
+                self.make_move(start_pos, end_pos)
+
     def make_move(self, start_pos, end_pos):
         piece = self.board.get_piece(start_pos)
         if not piece or piece.color != self.turn or self.game_over:
@@ -326,6 +468,30 @@ class ChessGame:
 
         if self.move_puts_king_in_check(start_pos, end_pos):
             return False, "You cannot move into check."
+
+        # --- CASTLING LOGIC ---
+        if isinstance(piece, King) and abs(start_pos[1] - end_pos[1]) == 2:
+            is_kingside = end_pos[1] > start_pos[1]
+            rook_start_col = 7 if is_kingside else 0
+            rook_end_col = 5 if is_kingside else 3
+            rook_start = (start_pos[0], rook_start_col)
+            rook_end = (start_pos[0], rook_end_col)
+
+            # Record the move before piece positions change
+            self._record_move_data(piece, start_pos, end_pos, captured_piece=None)
+
+            # Move pieces
+            self.board.move_piece(start_pos, end_pos) # Move King
+            self.board.move_piece(rook_start, rook_end) # Move Rook
+            
+            move_notation = "O-O" if is_kingside else "O-O-O"
+            self.move_history.append(move_notation)
+
+            self.turn = 'black' if self.turn == 'white' else 'white'
+            self._record_position()
+            self._update_game_status()
+            
+            return True, "Castle successful."
 
         if isinstance(piece, Pawn) and end_pos[0] in [0, 7]:
             captured_piece = self.board.get_piece(end_pos)
@@ -377,7 +543,6 @@ class ChessGame:
         if not new_piece_class:
             return False, "Invalid piece choice."
             
-        # The new promoted piece does not get a special name, just its class name
         new_piece = new_piece_class(pawn_color, end_pos)
         self.board.set_piece(start_pos, None)
         self.board.set_piece(end_pos, new_piece)
@@ -396,17 +561,10 @@ class ChessGame:
 
 
     def is_in_check(self, color):
+        """Determines if the specified player is in check."""
         king_pos = self.board.find_king(color)
-        if not king_pos: return False
-
-        opponent_color = 'black' if color == 'white' else 'white'
-        for r in range(8):
-            for c in range(8):
-                piece = self.board.get_piece((r, c))
-                if piece and piece.color == opponent_color:
-                    if king_pos in piece.get_valid_moves(self.board, self):
-                        return True
-        return False
+        if not king_pos: return False # Should not happen
+        return self.is_square_attacked(king_pos, 'black' if color == 'white' else 'white')
 
     def move_puts_king_in_check(self, start_pos, end_pos):
         original_piece = self.board.get_piece(start_pos)
