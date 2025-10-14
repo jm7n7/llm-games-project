@@ -1,4 +1,6 @@
 #--- imports----------
+import io
+import os
 import streamlit as st
 import pandas as pd
 from chess_logic import ChessGame 
@@ -8,8 +10,6 @@ from mancala import play_mancala
 from PIL import Image, ImageDraw, ImageFont
 from streamlit_image_coordinates import streamlit_image_coordinates
 from chess_app_functions import *
-import io
-import os
 
 #--- PAGE CONFIG --
 st.set_page_config(
