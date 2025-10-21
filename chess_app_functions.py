@@ -26,7 +26,7 @@ def draw_chess_board_pil(piece_images):
     BORDER_SIZE = 25
     IMG_SIZE = BOARD_SIZE + 2 * BORDER_SIZE
     
-    # --- Colors (RGBA tuples for transparency) ---
+    # --- Colors ---
     COLOR_LIGHT = "#F0D9B5"
     COLOR_DARK = "#4A4A4A"
     COLOR_BORDER = "#3C3A38"
@@ -39,6 +39,7 @@ def draw_chess_board_pil(piece_images):
     draw = ImageDraw.Draw(img)
 
     try:
+        # A common font that might be available on Streamlit Community Cloud
         coord_font = ImageFont.truetype("DejaVuSans.ttf", 14)
     except IOError:
         coord_font = ImageFont.load_default()
@@ -59,7 +60,7 @@ def draw_chess_board_pil(piece_images):
                 piece_img = piece_images[piece.image_name].resize((SQUARE_SIZE, SQUARE_SIZE), Image.Resampling.LANCZOS)
                 img.paste(piece_img, (x0, y0), piece_img)
 
-    # --- Overlay for highlights (coordinates must be converted) ---
+    # --- Overlay for highlights ---
     overlay = Image.new("RGBA", img.size, (0,0,0,0))
     draw_overlay = ImageDraw.Draw(overlay)
 
@@ -82,7 +83,6 @@ def draw_chess_board_pil(piece_images):
         
         selected_piece = board.get_piece(st.session_state.selected_square)
         if selected_piece and selected_piece.color == game.turn:
-            # Pass the 'game' object to get_valid_moves to check for en passant
             valid_moves = [m for m in selected_piece.get_valid_moves(board, game) if not game.move_puts_king_in_check(st.session_state.selected_square, m)]
             for move_br, move_bc in valid_moves:
                 move_dr = 7 - move_br if player_color == 'black' else move_br
@@ -93,26 +93,28 @@ def draw_chess_board_pil(piece_images):
     
     img = Image.alpha_composite(img, overlay)
 
-    # --- Draw coordinates from player's perspective ---
+    # --- Draw coordinates ---
     final_draw = ImageDraw.Draw(img)
     files = "abcdefgh"
     for i in range(8):
         file_char = files[i] if player_color == 'white' else files[7-i]
         rank_char = str(8 - i) if player_color == 'white' else str(i + 1)
-
         final_draw.text((BORDER_SIZE + i * SQUARE_SIZE + SQUARE_SIZE / 2, IMG_SIZE - BORDER_SIZE + 12), file_char, font=coord_font, fill=COLOR_COORD, anchor="ms")
         final_draw.text((BORDER_SIZE - 15, BORDER_SIZE + i * SQUARE_SIZE + SQUARE_SIZE / 2), rank_char, font=coord_font, fill=COLOR_COORD, anchor="rm")
         
     return img
 
-def handle_chess_click(coords):
+def get_click_board_coords(coords):
+    """Helper function to convert x,y click to board (r, c)"""
     SQUARE_SIZE, BORDER_SIZE = 80, 25
+    if not coords:
+        return None
+        
     draw_c = (coords['x'] - BORDER_SIZE) // SQUARE_SIZE
     draw_r = (coords['y'] - BORDER_SIZE) // SQUARE_SIZE
 
     player_color = st.session_state.get('player_color', 'white')
 
-    # Convert screen coordinates to board coordinates based on player perspective
     if player_color == 'black':
         r = 7 - draw_r
         c = 7 - draw_c
@@ -120,24 +122,12 @@ def handle_chess_click(coords):
         r = draw_r
         c = draw_c
     
-    pos = (r, c)
+    return (r, c)
 
-    if not (0 <= r < 8 and 0 <= c < 8) or st.session_state.chess_game.game_over:
-        return
-
-    game = st.session_state.chess_game
-    selected_piece = game.board.get_piece(st.session_state.selected_square) if st.session_state.selected_square else None
-    clicked_piece = game.board.get_piece(pos)
-
-    if selected_piece:
-        success, message = game.make_move(st.session_state.selected_square, pos)
-        st.session_state.selected_square = None 
-        if not success:
-             if clicked_piece and clicked_piece.color == game.turn:
-                 st.session_state.selected_square = pos
-             elif message != "Invalid move for this piece.":
-                 st.toast(message, icon="⚠️")
-    elif clicked_piece and clicked_piece.color == game.turn:
-        st.session_state.selected_square = pos
-    else:
-        st.session_state.selected_square = None
+def handle_chess_click(coords):
+    """
+    DEPRECATED: This function is no longer used in the main app.
+    The logic has been moved directly into app.py to handle the new game state
+    pipeline (e.g., store_pre_move_state, intervention checks, etc.).
+    """
+    pass
