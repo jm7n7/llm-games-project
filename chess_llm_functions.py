@@ -22,6 +22,8 @@ else:
 # Initialize the generative models
 commentator_model = genai.GenerativeModel('gemini-2.5-flash')
 coach_model = genai.GenerativeModel('gemini-2.5-flash')
+parser_model = genai.GenerativeModel('gemini-2.5-flash')
+visualizer_model = genai.GenerativeModel('gemini-2.5-flash') # New model for visualization data
 
 def get_move_commentary(move_data_dict):
     """
@@ -90,3 +92,112 @@ def get_coach_move_and_commentary(chat_session, game_data_history_str, legal_mov
         print(f"Error calling Coach LLM or parsing JSON: {e}")
         # Fallback move if the LLM fails
         return {"move": random.choice(legal_moves_list), "commentary": "I seem to be having a moment of processor-induced confusion. I'll just make a default move while I reboot my chess circuits."}
+
+def parse_spoken_move(spoken_text, legal_moves_list):
+    """
+    Uses an LLM to parse a spoken command and match it to a legal chess move.
+    """
+    legal_moves_str = ", ".join(legal_moves_list)
+    prompt = f"""
+    You are a chess notation expert. Your task is to interpret a player's spoken command
+    and determine which of the available legal moves they intended to make.
+
+    Spoken command: "{spoken_text}"
+
+    List of legal moves: {legal_moves_str}
+
+    Analyze the command and identify the single best matching move from the list.
+    Your response should be only the move in standard algebraic notation (e.g., "e2-e4"),
+    and nothing else. If no move is a clear match, respond with "None".
+    """
+    try:
+        response = parser_model.generate_content(prompt)
+        move = response.text.strip()
+        if move in legal_moves_list:
+            return move
+        return None
+    except Exception as e:
+        print(f"Error calling move parsing LLM: {e}")
+        return None
+
+def get_win_probability_data(game_data_str):
+    """
+    Asks an LLM to analyze a full game and return turn-by-turn win probabilities.
+    """
+    prompt = f"""
+    You are a chess grandmaster and data analyst. Your task is to analyze the following
+    chess game, provided as a JSON string of moves. For each turn, estimate the win
+    probability for both White and Black based on the board state at that time.
+
+    Game Data:
+    {game_data_str}
+
+    Your response MUST be a single valid JSON object. This object should contain one key,
+    "probabilities", which is a list of objects. Each object in the list should
+    represent a single turn and have three keys: "turn", "white_win_prob", and "black_win_prob".
+    Probabilities should be floats between 0.0 and 1.0. The sum of probabilities for each turn
+    should be 1.0.
+
+    Example format:
+    {{
+      "probabilities": [
+        {{"turn": 1, "white_win_prob": 0.5, "black_win_prob": 0.5}},
+        {{"turn": 2, "white_win_prob": 0.52, "black_win_prob": 0.48}}
+      ]
+    }}
+    """
+    try:
+        response = visualizer_model.generate_content(prompt)
+        # Clean the response to ensure it's valid JSON
+        json_str = response.text.strip().replace("```json", "").replace("```", "").strip()
+        return json_str
+    except Exception as e:
+        print(f"Error calling visualization LLM: {e}")
+        return None
+
+def get_material_advantage_data(game_data_str):
+    """
+    Asks an LLM to analyze a full game and return turn-by-turn material scores.
+    """
+    prompt = f"""
+    You are a chess engine and data analyst. Your task is to calculate the total material score for
+    both White and Black after each turn of the following chess game. The game is provided as a JSON
+    string of moves.
+
+    Use the standard point values for pieces:
+    - Pawn: 1 point
+    - Knight: 3 points
+    - Bishop: 3 points
+    - Rook: 5 points
+    - Queen: 9 points
+    - The King has no point value.
+
+    The initial score for both players is 39 (8 Pawns * 1 + 2 Knights * 3 + 2 Bishops * 3 + 2 Rooks * 5 + 1 Queen * 9).
+    Analyze the 'capture' and 'captured_piece' fields for each turn to determine the board state and calculate the cumulative material score for each player at the end of that turn.
+
+    Game Data:
+    {game_data_str}
+
+    Your response MUST be a single valid JSON object. This object should contain one key,
+    "scores", which is a list of objects. Each object in the list should
+    represent a single turn and have three keys: "turn", "white_score", and "black_score".
+    The scores should be integers.
+
+    Example format:
+    {{
+      "scores": [
+        {{"turn": 1, "white_score": 39, "black_score": 39}},
+        {{"turn": 2, "white_score": 39, "black_score": 39}},
+        {{"turn": 3, "white_score": 39, "black_score": 36}}
+      ]
+    }}
+    """
+    try:
+        response = visualizer_model.generate_content(prompt)
+        # Clean the response to ensure it's valid JSON
+        json_str = response.text.strip().replace("```json", "").replace("```", "").strip()
+        return json_str
+    except Exception as e:
+        print(f"Error calling material advantage LLM: {e}")
+        return None
+

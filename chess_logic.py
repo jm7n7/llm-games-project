@@ -413,7 +413,7 @@ class ChessGame:
 
     def _notation_to_pos_tuple(self, notation):
         """Converts algebraic notation (e.g., 'e4') to a (row, col) tuple."""
-        if not notation or len(notation) != 2: return None
+        if not isinstance(notation, str) or len(notation) != 2: return None
         files, rank = "abcdefgh", notation[1]
         if notation[0] not in files or not rank.isdigit(): return None
         return (8 - int(rank), files.index(notation[0]))
@@ -444,18 +444,16 @@ class ChessGame:
             self.last_coach_commentary = coach_response['commentary']
             move_str = coach_response['move']
             
-            if move_str in legal_moves:
-                start_notation, end_notation = move_str.split('-')
-                start_pos = self._notation_to_pos_tuple(start_notation)
-                end_pos = self._notation_to_pos_tuple(end_notation)
-                if start_pos and end_pos:
-                    self.make_move(start_pos, end_pos)
-            else:
+            # Use the new helper function to make the move
+            success, message = self.make_move_from_notation(move_str, is_ai_move=True)
+            if not success:
                 print(f"Error: AI returned an illegal move: {move_str}. Making a default move.")
-                default_move = legal_moves[0]
-                start_pos = self._notation_to_pos_tuple(default_move.split('-')[0])
-                end_pos = self._notation_to_pos_tuple(default_move.split('-')[1])
-                self.make_move(start_pos, end_pos)
+                self.make_move_from_notation(legal_moves[0], is_ai_move=True)
+        else:
+            # Fallback if the response is not as expected
+            print("Error: AI response was not in the correct format. Making a default move.")
+            self.make_move_from_notation(legal_moves[0], is_ai_move=True)
+
 
     def make_move(self, start_pos, end_pos):
         piece = self.board.get_piece(start_pos)
@@ -529,6 +527,32 @@ class ChessGame:
         self._record_move_data(piece, start_pos, end_pos, captured_piece)
 
         return True, self.status_message
+        
+    def make_move_from_notation(self, move_str, is_ai_move=False):
+        """
+        Helper function to make a move using notation like 'e2-e4'.
+        This simplifies handling moves from the AI and spoken commands.
+        """
+        if '-' not in move_str:
+            return False, "Invalid move format."
+        
+        start_notation, end_notation = move_str.split('-')
+        start_pos = self._notation_to_pos_tuple(start_notation)
+        end_pos = self._notation_to_pos_tuple(end_notation)
+
+        if not start_pos or not end_pos:
+            return False, "Invalid notation."
+            
+        success, message = self.make_move(start_pos, end_pos)
+        
+        # If the move was successful and it was NOT the AI's turn,
+        # it must have been the player's turn, so we request the AI move.
+        # We check `is_ai_move` to prevent an infinite loop of AI vs AI.
+        if success and not is_ai_move and not self.game_over:
+            self.request_ai_move()
+            
+        return success, message
+
 
     def promote_pawn(self, piece_choice_str):
         if not self.promotion_pending:
@@ -556,7 +580,11 @@ class ChessGame:
         self._update_game_status()
         
         self._record_move_data(original_pawn, start_pos, end_pos, captured_piece, promoted_into=piece_choice_str)
-        
+
+        # After promotion, if it's now the AI's turn, request its move.
+        if not self.game_over and self.turn != pawn_color:
+            self.request_ai_move()
+
         return True, "Pawn promoted successfully."
 
 
@@ -611,4 +639,3 @@ class ChessGame:
 
     def is_stalemate(self, color):
         return not self.is_in_check(color) and not self.has_legal_moves(color)
-
