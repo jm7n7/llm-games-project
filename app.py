@@ -2,9 +2,7 @@
 import streamlit as st
 import pandas as pd
 from chess_logic import ChessGame 
-from connect4 import play_four_in_a_row
-from scrabble import play_letter_tile_game
-from mancala import play_mancala
+
 from PIL import Image, ImageDraw, ImageFont
 from streamlit_image_coordinates import streamlit_image_coordinates
 from chess_app_functions import *
@@ -24,7 +22,7 @@ st.title("Game Arcade")
 st.sidebar.header("Choose a Game")
 game_selection = st.sidebar.radio(
     "Select a game to play:",
-    ("Home", "Chess", "Four-in-a-row", "Letter-Tile-Game", "Mancala")
+    ("Home", "Chess")
 )
 #--- MAIN CONTENT AREA ROUTER -----------------------------------------------
 if game_selection == "Home":
@@ -115,16 +113,6 @@ elif game_selection == "Chess":
                 st.subheader("Game Data Log")
                 df = pd.DataFrame(game.game_data)
                 st.dataframe(df)
-
-
-elif game_selection == "Four-in-a-row":
-    play_four_in_a_row()
-
-elif game_selection == "Letter-Tile-Game":
-    play_letter_tile_game()
-
-elif game_selection == "Mancala":
-    play_mancala()
 
 #--- ABOUT SECTION IN SIDEBAR-------------
 st.sidebar.header("About")
