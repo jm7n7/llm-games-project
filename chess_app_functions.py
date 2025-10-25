@@ -2,6 +2,7 @@ import os
 import streamlit as st
 from PIL import Image, ImageDraw, ImageFont
 from streamlit_image_coordinates import streamlit_image_coordinates
+import time # Added for potential future pulsing, though not used for static color
 
 def load_piece_images():
     """Loads all piece images from the assets folder."""
@@ -14,7 +15,7 @@ def load_piece_images():
             images[filename] = Image.open(os.path.join("assets", filename)).convert("RGBA")
     return images
 
-def draw_chess_board_pil(piece_images):
+def draw_chess_board_pil(piece_images, is_opponent_thinking=False):
     """Renders the chessboard using the Pillow library and piece images."""
     board = st.session_state.chess_game.board
     game = st.session_state.chess_game
@@ -26,10 +27,15 @@ def draw_chess_board_pil(piece_images):
     BORDER_SIZE = 25
     IMG_SIZE = BOARD_SIZE + 2 * BORDER_SIZE
     
-    # --- Colors ---
+    # --- Colors (RGBA tuples for transparency) ---
     COLOR_LIGHT = "#F0D9B5"
     COLOR_DARK = "#4A4A4A"
-    COLOR_BORDER = "#3C3A38"
+    
+    # --- Modified Border ---
+    COLOR_BORDER_DEFAULT = "#3C3A38"
+    COLOR_BORDER_THINKING = "#EBD453" # Bright "thinking" yellow
+    COLOR_BORDER = COLOR_BORDER_THINKING if is_opponent_thinking else COLOR_BORDER_DEFAULT
+    
     COLOR_COORD = "#E2E1E1"
     COLOR_SELECTED = (100, 149, 237, 178) 
     COLOR_VALID_MOVE = (144, 238, 144, 153)
@@ -39,7 +45,6 @@ def draw_chess_board_pil(piece_images):
     draw = ImageDraw.Draw(img)
 
     try:
-        # A common font that might be available on Streamlit Community Cloud
         coord_font = ImageFont.truetype("DejaVuSans.ttf", 14)
     except IOError:
         coord_font = ImageFont.load_default()
@@ -57,13 +62,14 @@ def draw_chess_board_pil(piece_images):
 
             piece = board.get_piece((board_r, board_c))
             if piece and piece.image_name in piece_images:
+                # --- FIX: Changed 'filename' to 'piece.image_name' ---
                 piece_img = piece_images[piece.image_name].resize((SQUARE_SIZE, SQUARE_SIZE), Image.Resampling.LANCZOS)
                 img.paste(piece_img, (x0, y0), piece_img)
 
-    # --- Overlay for highlights ---
+    # --- Overlay for highlights (coordinates must be converted) ---
     overlay = Image.new("RGBA", img.size, (0,0,0,0))
     draw_overlay = ImageDraw.Draw(overlay)
-
+    
     king_pos = game.board.find_king(game.turn)
     if king_pos and game.is_in_check(game.turn):
         board_r, board_c = king_pos
@@ -83,6 +89,7 @@ def draw_chess_board_pil(piece_images):
         
         selected_piece = board.get_piece(st.session_state.selected_square)
         if selected_piece and selected_piece.color == game.turn:
+            # Pass the 'game' object to get_valid_moves to check for en passant
             valid_moves = [m for m in selected_piece.get_valid_moves(board, game) if not game.move_puts_king_in_check(st.session_state.selected_square, m)]
             for move_br, move_bc in valid_moves:
                 move_dr = 7 - move_br if player_color == 'black' else move_br
@@ -93,12 +100,13 @@ def draw_chess_board_pil(piece_images):
     
     img = Image.alpha_composite(img, overlay)
 
-    # --- Draw coordinates ---
+    # --- Draw coordinates from player's perspective ---
     final_draw = ImageDraw.Draw(img)
     files = "abcdefgh"
     for i in range(8):
         file_char = files[i] if player_color == 'white' else files[7-i]
         rank_char = str(8 - i) if player_color == 'white' else str(i + 1)
+
         final_draw.text((BORDER_SIZE + i * SQUARE_SIZE + SQUARE_SIZE / 2, IMG_SIZE - BORDER_SIZE + 12), file_char, font=coord_font, fill=COLOR_COORD, anchor="ms")
         final_draw.text((BORDER_SIZE - 15, BORDER_SIZE + i * SQUARE_SIZE + SQUARE_SIZE / 2), rank_char, font=coord_font, fill=COLOR_COORD, anchor="rm")
         
@@ -115,6 +123,7 @@ def get_click_board_coords(coords):
 
     player_color = st.session_state.get('player_color', 'white')
 
+    # Convert screen coordinates to board coordinates
     if player_color == 'black':
         r = 7 - draw_r
         c = 7 - draw_c
@@ -124,10 +133,3 @@ def get_click_board_coords(coords):
     
     return (r, c)
 
-def handle_chess_click(coords):
-    """
-    DEPRECATED: This function is no longer used in the main app.
-    The logic has been moved directly into app.py to handle the new game state
-    pipeline (e.g., store_pre_move_state, intervention checks, etc.).
-    """
-    pass
