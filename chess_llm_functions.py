@@ -14,8 +14,8 @@ COMMENTATOR_KEY = os.environ.get("COMMENTATOR_KEY")
 
 # --- MODEL INITIALIZATION ---
 # Using specific models as requested by the architecture
-commentator_model = genai.GenerativeModel('gemini-2.5-flash-lite-preview-09-2025')
-coach_model = genai.GenerativeModel('gemini-2.5-flash-lite')
+commentator_model = genai.GenerativeModel('gemini-2.5-flash')
+coach_model = genai.GenerativeModel('gemini-2.5-pro')
 opponent_model = genai.GenerativeModel('gemini-2.5-flash')
 
 # --- COMMENTATOR FUNCTION (NOW ACTIVELY USED) ---
@@ -35,21 +35,28 @@ def get_move_commentary(move_data_dict):
         
         Move Data: {json.dumps(move_data_dict)}
         """
-        # Using generate_content for a non-streaming, simple response
+        # --- FIX: Added the missing API call and return ---
         response = commentator_model.generate_content(prompt)
         return response.text.strip()
+    # --- FIX: Added the missing except block ---
     except Exception as e:
         print(f"Error calling Commentator LLM: {e}")
         # Provide a fallback commentary that still works
         return f"Move: {move_data_dict.get('piece_moved')} from {move_data_dict.get('start_square')} to {move_data_dict.get('end_square')}."
 
-# --- AI OPPONENT FUNCTIONS (Unchanged) ---
-# These functions already accept the full game history JSON,
-# which aligns with the new architecture.
-def initialize_opponent_chat():
+# --- AI OPPONENT FUNCTIONS (MODIFIED) ---
+
+# This function is no longer needed with a stateless model
+# def initialize_opponent_chat():
+#     ...
+
+def get_ai_opponent_move(game_data_history_str, legal_moves_list): # Removed chat_session
     """
-    Initializes and returns a new chat session with the AI Opponent LLM.
+    Sends the full game history (JSON) to the Opponent LLM and gets its next move
+    using a stateless generate_content call.
     """
+    
+    # Persona and history setup
     persona_prompt = """
     You are an AI Chess Opponent. Your sole purpose is to play chess. 
     You will be given the entire game history as a JSON log and a list of legal moves.
@@ -57,31 +64,33 @@ def initialize_opponent_chat():
     Your response MUST be a valid JSON object with one key: "move".
     - The "move" value must be one of the legal moves provided.
     
-    Your goal is to play a strong, challenging, and human-like game.
+    Your goal is to win by playing a strong, challenging, and human-like game.
     """
-    chat = opponent_model.start_chat(history=[
-        {'role': 'user', 'parts': [persona_prompt]},
-        {'role': 'model', 'parts': ['{"move": "Understood. I will select a move from the legal moves list and provide it in the required JSON format."}']}
-    ])
-    return chat
+    
+    dynamic_prompt = f"""
+    Here is the game history so far in a list of dictionaries format (JSON):
+    {game_data_history_str}
 
-def get_ai_opponent_move(chat_session, game_data_history_str, legal_moves_list):
+    Here is the list of your available legal moves:
+    {", ".join(legal_moves_list)}
+
+    Based on this history, provide your response in the required JSON format.
     """
-    Sends the full game history (JSON) to the Opponent LLM and gets its next move.
-    """
+
+    # Construct the full contents for the one-shot call
+    # This mimics the old chat history but in a single request
+    contents = [
+        {'role': 'user', 'parts': [persona_prompt]},
+        {'role': 'model', 'parts': ['{"move": "Understood. I will select a move from the legal moves list and provide it in the required JSON format."}']},
+        {'role': 'user', 'parts': [dynamic_prompt]}
+    ]
+
     try:
         genai.configure(api_key=AI_OPPONENT_KEY)
-        legal_moves_str = ", ".join(legal_moves_list)
-        prompt = f"""
-        Here is the game history so far in a list of dictionaries format (JSON):
-        {game_data_history_str}
-
-        Here is the list of your available legal moves:
-        {legal_moves_str}
-
-        Based on this history, provide your response in the required JSON format.
-        """
-        response = chat_session.send_message(prompt)
+        
+        # Use generate_content instead of chat_session.send_message
+        response = opponent_model.generate_content(contents) 
+        
         # Clean the response to extract only the JSON part
         json_str = response.text.strip().replace("```json", "").replace("```", "").strip()
         parsed_json = json.loads(json_str)
@@ -244,3 +253,4 @@ def get_coach_qa_response(chat_session, user_query, game_history_json_str):
             yield _MockChunk(json.dumps(fallback_json))
         
         return fallback_stream()
+

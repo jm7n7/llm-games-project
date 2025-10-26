@@ -54,7 +54,7 @@ if 'chess_game' not in st.session_state:
     # --- State for new LLM flow ---
     st.session_state.pending_ai_move = None
     st.session_state.coach_stream_data = None
-    st.session_state.opponent_chat_session = None # Stores the initialized opponent chat
+    # st.session_state.opponent_chat_session = None # No longer needed
     st.session_state.opponent_context = None      # Stores (game_history_json, legal_moves)
 
 game = st.session_state.chess_game
@@ -107,7 +107,7 @@ def draw_right_panel(chat_spinner=False, stream_data=None, is_board_disabled=Fal
                 st.session_state.chat_history.append({"role": "coach", "text": "Okay, take another look. What's a better move?"})
                 # Clear pending AI state
                 st.session_state.pending_ai_move = None
-                st.session_state.opponent_chat_session = None
+                # st.session_state.opponent_chat_session = None # No longer needed
                 st.session_state.opponent_context = None
                 st.session_state.last_click = None
                 st.session_state.chess_game_phase = 'playing'
@@ -271,8 +271,8 @@ elif phase == 'processing_llms':
         )
         
         # 6. Prepare Opponent context (but do not call yet)
-        fresh_opponent_session = ll_api.initialize_opponent_chat()
-        st.session_state.opponent_chat_session = fresh_opponent_session
+        # fresh_opponent_session = ll_api.initialize_opponent_chat() # No longer needed
+        # st.session_state.opponent_chat_session = fresh_opponent_session # No longer needed
         st.session_state.opponent_context = (game_history_json_str, legal_moves)
         
         # 7. Move to streaming phase
@@ -382,7 +382,7 @@ elif phase == 'processing_ai_move':
         
         # Clear all pending AI contexts
         st.session_state.pending_ai_move = None
-        st.session_state.opponent_chat_session = None
+        # st.session_state.opponent_chat_session = None # No longer needed
         st.session_state.opponent_context = None
         st.session_state.selected_square = None
         game.clear_pre_move_state()
@@ -390,25 +390,27 @@ elif phase == 'processing_ai_move':
 
     else:
         # --- PART 1: Fetch the AI move ---
-        chat_session = st.session_state.opponent_chat_session
+        # chat_session = st.session_state.opponent_chat_session # No longer needed
         context = st.session_state.opponent_context
         
         game_history_json_str = None
         legal_moves_list = None
 
-        if chat_session and context:
+        if context: # Modified (was if chat_session and context)
             # This is the normal flow after a human move
             game_history_json_str, legal_moves_list = context
         else:
             # This is the fallback for "Play as Black" (AI moves first)
             game_history_json_str = json.dumps(game.game_data)
             legal_moves_list = game._get_all_legal_moves(st.session_state.ai_color)
-            chat_session = ll_api.initialize_opponent_chat()
+            # chat_session = ll_api.initialize_opponent_chat() # No longer needed
 
         if legal_moves_list:
             # Call Opponent LLM
             ai_response = ll_api.get_ai_opponent_move(
-                chat_session, game_history_json_str, legal_moves_list
+                # chat_session, # Removed
+                game_history_json_str, 
+                legal_moves_list
             )
             # Store the move. The rerun will trigger PART 2 of this phase.
             st.session_state.pending_ai_move = ai_response['move']
@@ -417,3 +419,4 @@ elif phase == 'processing_ai_move':
             st.session_state.chess_game_phase = 'playing'
         
         st.rerun()
+
