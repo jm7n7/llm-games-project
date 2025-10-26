@@ -428,3 +428,90 @@ class ChessGame:
     def is_stalemate(self, color):
         return not self.is_in_check(color) and not self.has_legal_moves(color)
 
+    def get_board_state_narrative(self):
+        """
+        Generates a 100% accurate, human-readable narrative of the
+        current board state, including piece locations, attacked squares,
+        and game status.
+        """
+        narrative = ["Board State:"]
+        
+        # Get piece lists
+        white_pieces = []
+        black_pieces = []
+        for r in range(8):
+            for c in range(8):
+                piece = self.board.get_piece((r, c))
+                if piece:
+                    if piece.color == 'white':
+                        white_pieces.append((r, c))
+                    else:
+                        black_pieces.append((r, c))
+
+        # White pieces
+        narrative.append("\nWhite Pieces:")
+        for (r, c) in white_pieces:
+            piece = self.board.get_piece((r, c))
+            attack_squares_pos = piece.get_attack_squares(self.board)
+            attack_squares_notation = [self.pos_to_notation(pos) for pos in attack_squares_pos]
+            attack_str = ""
+            if attack_squares_notation:
+                attack_str = f" (attacking {', '.join(attack_squares_notation)})"
+            narrative.append(f"* {piece.name} on {self.pos_to_notation((r, c))}{attack_str}")
+
+        # Black pieces
+        narrative.append("\nBlack Pieces:")
+        for (r, c) in black_pieces:
+            piece = self.board.get_piece((r, c))
+            attack_squares_pos = piece.get_attack_squares(self.board)
+            attack_squares_notation = [self.pos_to_notation(pos) for pos in attack_squares_pos]
+            attack_str = ""
+            if attack_squares_notation:
+                attack_str = f" (attacking {', '.join(attack_squares_notation)})"
+            narrative.append(f"* {piece.name} on {self.pos_to_notation((r, c))}{attack_str}")
+
+        # Game Status
+        narrative.append("\nGame Status:")
+        narrative.append(f"* It is {self.turn.capitalize()}'s turn to move.")
+        
+        # --- Check Status ---
+        if self.is_in_check(self.turn):
+            narrative.append(f"* The {self.turn.capitalize()} King is in check.")
+        else:
+            narrative.append(f"* The {self.turn.capitalize()} King is not in check.")
+        
+        # --- Castling Rights ---
+        castling_rights = []
+        king_w = self.board.get_piece((7, 4))
+        rook_w_k = self.board.get_piece((7, 7))
+        rook_w_q = self.board.get_piece((7, 0))
+        if isinstance(king_w, King) and not king_w.has_moved:
+            if isinstance(rook_w_k, Rook) and not rook_w_k.has_moved:
+                castling_rights.append("White Kingside")
+            if isinstance(rook_w_q, Rook) and not rook_w_q.has_moved:
+                castling_rights.append("White Queenside")
+
+        king_b = self.board.get_piece((0, 4))
+        rook_b_k = self.board.get_piece((0, 7))
+        rook_b_q = self.board.get_piece((0, 0))
+        if isinstance(king_b, King) and not king_b.has_moved:
+            if isinstance(rook_b_k, Rook) and not rook_b_k.has_moved:
+                castling_rights.append("Black Kingside")
+            if isinstance(rook_b_q, Rook) and not rook_b_q.has_moved:
+                castling_rights.append("Black Queenside")
+
+        if castling_rights:
+            narrative.append(f"* Available Castling: {', '.join(castling_rights)}.")
+        else:
+            narrative.append("* No castling rights remain.")
+
+        # --- En Passant ---
+        if self.en_passant_target:
+            narrative.append(f"* The en passant target square is {self.pos_to_notation(self.en_passant_target)}.")
+        else:
+            narrative.append(f"* There is no en passant target square.")
+            
+        return "\n".join(narrative)
+
+
+
