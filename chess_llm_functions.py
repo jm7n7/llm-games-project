@@ -6,23 +6,23 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # --- API KEY CONFIG ---
-# Ensure these are set in your environment or .env file
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
 AI_OPPONENT_KEY = os.environ.get("AI_OPPONENT_KEY")
 COACH_KEY = os.environ.get("COACH_KEY")
 COMMENTATOR_KEY = os.environ.get("COMMENTATOR_KEY")
 
 # --- MODEL INITIALIZATION ---
-# Using specific models as requested by the architecture
-commentator_model = genai.GenerativeModel('gemini-2.5-flash')
+# Using Flash for speed-sensitive tasks (commentary, opponent)
+# Using Pro for complex analysis (coach)
+commentator_model = genai.GenerativeModel('gemini-2.5-flash') 
 coach_model = genai.GenerativeModel('gemini-2.5-pro')
-opponent_model = genai.GenerativeModel('gemini-2.5-flash')
+opponent_model = genai.GenerativeModel('gemini-2.5-pro') 
 
-# --- COMMENTATOR FUNCTION (NOW ACTIVELY USED) ---
+# --- COMMENTATOR FUNCTION ---
 def get_move_commentary(move_data_dict):
     """
-    Uses the Commentator LLM to turn a single move's data (a dictionary)
-    into a single, natural language sentence.
+    Uses the Commentator LLM to turn a single move's data into a
+    natural language sentence.
     """
     try:
         genai.configure(api_key=COMMENTATOR_KEY)
@@ -36,64 +36,55 @@ def get_move_commentary(move_data_dict):
         Move Data: {json.dumps(move_data_dict)}
         """
         response = commentator_model.generate_content(prompt)
-        
-        # --- ADDED PRINT STATEMENT ---
-        print(f"--- COMMENTATOR RESPONSE --- \n{response.text.strip()}\n------------------------------")
-        
+        print("--- COMMENTATOR RESPONSE ---")
+        print(response.text.strip())
+        print("------------------------------")
         return response.text.strip()
     except Exception as e:
         print(f"Error calling Commentator LLM: {e}")
-        # Provide a fallback commentary that still works
-        return f"Move: {move_data_dict.get('piece_moved')} from {move_data_dict.get('start_square')} to {move_data_dict.get('end_square')}."
+        return "The commentator is speechless."
 
-# --- AI OPPONENT FUNCTIONS (MODIFIED) ---
-
-def get_ai_opponent_move(game_data_history_str, legal_moves_list): # Removed chat_session
+# --- AI OPPONENT FUNCTION (Refactored) ---
+def get_ai_opponent_move(board_state_narrative, legal_moves_list):
     """
-    Sends the full game history (JSON) to the Opponent LLM and gets its next move
-    using a stateless generate_content call.
+    Sends the board state narrative and legal moves to the Opponent LLM
+    (stateless) to get its next move.
     """
-    
-    # Persona and history setup
-    persona_prompt = """
-    You are an AI Chess Opponent. Your sole purpose is to play chess. 
-    You will be given the entire game history as a JSON log and a list of legal moves.
-    
-    Your response MUST be a valid JSON object with one key: "move".
-    - The "move" value must be one of the legal moves provided.
-    
-    Your goal is to play a strong, challenging, and human-like game.
-    """
-    
-    dynamic_prompt = f"""
-    Here is the game history so far in a list of dictionaries format (JSON):
-    {game_data_history_str}
-
-    Here is the list of your available legal moves:
-    {", ".join(legal_moves_list)}
-
-    Based on this history, provide your response in the required JSON format.
-    """
-
-    # Construct the full contents for the one-shot call
-    # This mimics the old chat history but in a single request
-    contents = [
-        {'role': 'user', 'parts': [persona_prompt]},
-        {'role': 'model', 'parts': ['{"move": "Understood. I will select a move from the legal moves list and provide it in the required JSON format."}']},
-        {'role': 'user', 'parts': [dynamic_prompt]}
-    ]
-
     try:
         genai.configure(api_key=AI_OPPONENT_KEY)
+        legal_moves_str = ", ".join(legal_moves_list)
         
-        # Use generate_content instead of chat_session.send_message
-        response = opponent_model.generate_content(contents) 
+        prompt = f"""
+        You are an AI Chess Opponent. Your sole purpose is to play chess.
+        You will be given two pieces of information:
+        1.  `BOARD_STATE_NARRATIVE`: A 100% accurate, human-readable description of
+            all piece locations, attack lines, and the current game status.
+            **THIS IS YOUR ABSOLUTE SOURCE OF TRUTH.**
+        2.  `LEGAL_MOVES`: A list of all legal moves you can make.
+
+        Your task is to analyze the `BOARD_STATE_NARRATIVE`, decide on the
+        strongest, most human-like move, and select it from the `LEGAL_MOVES` list.
+
+        Your response MUST be a valid JSON object with one key: "move".
+        - The "move" value must be one of the legal moves provided.
+
+        BOARD_STATE_NARRATIVE:
+        {board_state_narrative}
+
+        LEGAL_MOVES:
+        {legal_moves_str}
+
+        Provide your response in the required JSON format.
+        """
+        
+        response = opponent_model.generate_content(prompt)
         
         # Clean the response to extract only the JSON part
         json_str = response.text.strip().replace("```json", "").replace("```", "").strip()
         
-        # --- ADDED PRINT STATEMENT ---
-        print(f"--- AI OPPONENT RESPONSE (RAW) --- \n{json_str}\n----------------------------------")
+        print("--- AI OPPONENT RESPONSE (RAW) ---")
+        print(json_str)
+        print("---------------------------------")
         
         parsed_json = json.loads(json_str)
         
@@ -106,11 +97,12 @@ def get_ai_opponent_move(game_data_history_str, legal_moves_list): # Removed cha
             
     except Exception as e:
         print(f"Error calling Opponent LLM or parsing JSON: {e}")
+        print("--- AI OPPONENT ERROR: Choosing random fallback move. ---")
         # Fallback move if the LLM fails
         return {"move": random.choice(legal_moves_list)}
 
 
-# --- COACH FUNCTIONS (MODIFIED FOR NEW CONTEXT) ---
+# --- COACH FUNCTIONS ---
 
 class _MockChunk:
     """Mocks a stream chunk object with a .text attribute for fallback."""
@@ -120,7 +112,7 @@ class _MockChunk:
 def initialize_coach_chat():
     """
     Initializes and returns a new chat session with the Coach LLM,
-    including the *updated* system persona prompt.
+    including the system persona prompt.
     """
     persona_prompt = """
     You are 'Coach Gemini,' a grandmaster-level chess player and expert coach.
@@ -270,6 +262,4 @@ def get_coach_qa_response(chat_session, user_query, board_state_narrative):
             yield _MockChunk(json.dumps(fallback_json))
         
         return fallback_stream()
-
-
 
