@@ -2,9 +2,8 @@
 import streamlit as st
 import pandas as pd
 from chess_logic import ChessGame 
-import chess_llm_functions as ll_api
-import json
-from PIL import Image
+
+from PIL import Image, ImageDraw, ImageFont
 from streamlit_image_coordinates import streamlit_image_coordinates
 from chess_app_functions import *
 import os
@@ -19,9 +18,17 @@ st.set_page_config(
 #--- APP TITLE AND HEADER------
 st.title("LLM Chess Coach")
 
-#--- SIDEBAR (simplified) -------------
-st.sidebar.header("About")
-st.sidebar.info("This chess app uses three distinct LLMs to create a dynamic coaching experience. An Opponent LLM plays against you, while a Coach LLM analyzes your moves for key learning moments.")
+#--- SIDEBAR FOR GAME SELECTION-------------
+st.sidebar.header("Choose a Game")
+game_selection = st.sidebar.radio(
+    "Select a game to play:",
+    ("Home", "Chess")
+)
+#--- MAIN CONTENT AREA ROUTER -----------------------------------------------
+if game_selection == "Home":
+    st.header("Welcome to the Game Arcade!")
+    st.info("Select a game from the sidebar on the left to start playing.")
+    st.markdown("This app is a collection of classic board and word games built from scratch. Enjoy your stay!")
 
 
 #--- MAIN CONTENT AREA -----------------------------------------------
@@ -318,89 +325,7 @@ elif phase == 'streaming_coach_response':
         print(f"Could not parse JSON, falling back to raw text. Error: {e}\nRaw text: {streamed_text}")
         final_commentary = streamed_text if streamed_text else "My apologies, I had a connection issue."
 
-    stream_type = st.session_state.get('stream_type', 'analysis')
-    st.session_state.stream_type = None # Clear stream type
-
-    if stream_type == 'analysis' and final_commentary.startswith("[INTERVENTION]"):
-        # Coach wants to stop the game
-        cleaned_commentary = final_commentary.replace("[INTERVENTION]", "").strip()
-        st.session_state.chat_history.append({"role": "coach", "text": cleaned_commentary})
-        st.session_state.chess_game_phase = 'awaiting_user_decision'
-    elif stream_type == 'analysis':
-        # Normal analysis, proceed to AI move
-        game.clear_pre_move_state() # Finalize the human's move
-        st.session_state.chat_history.append({"role": "coach", "text": final_commentary})
-        st.session_state.chess_game_phase = 'processing_ai_move'
-    elif stream_type == 'ai_analysis':
-        # This was just an acknowledgment of the AI's move
-        if final_commentary and final_commentary != "...": # Don't log silent failures
-            st.session_state.chat_history.append({"role": "coach", "text": final_commentary})
-        st.session_state.chess_game_phase = 'playing' # NOW the user can play
-    elif stream_type == 'chat':
-        # This was a Q&A response
-        st.session_state.chat_history.append({"role": "coach", "text": final_commentary})
-        st.session_state.chess_game_phase = st.session_state.get('return_phase', 'playing')
-        st.session_state.return_phase = None
-    
-    st.session_state.coach_stream_data = None # Clear the stream data
-    st.rerun()
-
-elif phase == 'processing_ai_move':
-    # --- This phase runs after the Coach approves the human move ---
-    
-    # 1. Get the current, accurate board state
-    board_state_narrative = game.get_board_state_narrative()
-    
-    # 2. Get the legal moves for the AI
-    legal_moves = game._get_all_legal_moves(st.session_state.ai_color)
-
-    if legal_moves:
-        # 3. Call the refactored opponent function
-        ai_response = ll_api.get_ai_opponent_move(
-            board_state_narrative,
-            legal_moves
-        )
-        st.session_state.pending_ai_move = ai_response['move']
-    else:
-        # No legal moves, game is over (checkmate/stalemate)
-        st.session_state.chess_game_phase = 'playing'
-        st.rerun()
-
-    # 4. Make the AI's move on the board
-    move_str = st.session_state.pending_ai_move
-    if move_str:
-        start_pos = game._notation_to_pos_tuple(move_str.split('-')[0])
-        end_pos = game._notation_to_pos_tuple(move_str.split('-')[1])
-        game.make_move(start_pos, end_pos)
-        
-        # Auto-promote to Queen if AI gets a promotion
-        if game.promotion_pending:
-            game.promote_pawn("Queen")
-        
-        # 5. Get context for the Coach's *acknowledgment*
-        ai_move_data = game.game_data[-1]
-        ai_move_commentary = ll_api.get_move_commentary(ai_move_data)
-        
-        # Get the new board state *after* the AI's move
-        board_state_narrative_after_ai = game.get_board_state_narrative()
-        
-        # 6. Call Coach for acknowledgment
-        fresh_coach_session = ll_api.initialize_coach_chat()
-        st.session_state.coach_stream_data = ll_api.get_coach_ai_analysis(
-            fresh_coach_session, 
-            ai_move_commentary,
-            board_state_narrative_after_ai # Pass the new ground truth
-        )
-        
-        # 7. Set state for streaming coach's reply
-        st.session_state.stream_type = 'ai_analysis'
-        st.session_state.chess_game_phase = 'streaming_coach_response'
-        
-        st.session_state.pending_ai_move = None
-        st.session_state.selected_square = None
-        game.clear_pre_move_state()
-        st.rerun()
-    
-    st.session_state.chess_game_phase = 'playing'
-    st.rerun()
+#--- ABOUT SECTION IN SIDEBAR-------------
+st.sidebar.header("About")
+st.sidebar.info("This is a collection of simple games built using Streamlit.")
 
