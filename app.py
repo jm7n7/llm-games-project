@@ -8,6 +8,7 @@ from streamlit_image_coordinates import streamlit_image_coordinates
 from chess_app_functions import *
 import os
 import time
+#This should look correct
 
 #--- PAGE CONFIG --
 st.set_page_config(
