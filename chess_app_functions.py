@@ -2,6 +2,7 @@ import os
 import streamlit as st
 from PIL import Image, ImageDraw, ImageFont
 from streamlit_image_coordinates import streamlit_image_coordinates
+import time # Added for potential future pulsing, though not used for static color
 
 def load_piece_images():
     """Loads all piece images from the assets folder."""
@@ -14,7 +15,7 @@ def load_piece_images():
             images[filename] = Image.open(os.path.join("assets", filename)).convert("RGBA")
     return images
 
-def draw_chess_board_pil(piece_images):
+def draw_chess_board_pil(piece_images, is_opponent_thinking=False):
     """Renders the chessboard using the Pillow library and piece images."""
     board = st.session_state.chess_game.board
     game = st.session_state.chess_game
@@ -29,7 +30,12 @@ def draw_chess_board_pil(piece_images):
     # --- Colors (RGBA tuples for transparency) ---
     COLOR_LIGHT = "#F0D9B5"
     COLOR_DARK = "#4A4A4A"
-    COLOR_BORDER = "#3C3A38"
+    
+    # --- Modified Border ---
+    COLOR_BORDER_DEFAULT = "#3C3A38"
+    COLOR_BORDER_THINKING = "#EBD453" # Bright "thinking" yellow
+    COLOR_BORDER = COLOR_BORDER_THINKING if is_opponent_thinking else COLOR_BORDER_DEFAULT
+    
     COLOR_COORD = "#E2E1E1"
     COLOR_SELECTED = (100, 149, 237, 178) 
     COLOR_VALID_MOVE = (144, 238, 144, 153)
@@ -56,13 +62,14 @@ def draw_chess_board_pil(piece_images):
 
             piece = board.get_piece((board_r, board_c))
             if piece and piece.image_name in piece_images:
+                # --- FIX: Changed 'filename' to 'piece.image_name' ---
                 piece_img = piece_images[piece.image_name].resize((SQUARE_SIZE, SQUARE_SIZE), Image.Resampling.LANCZOS)
                 img.paste(piece_img, (x0, y0), piece_img)
 
     # --- Overlay for highlights (coordinates must be converted) ---
     overlay = Image.new("RGBA", img.size, (0,0,0,0))
     draw_overlay = ImageDraw.Draw(overlay)
-
+    
     king_pos = game.board.find_king(game.turn)
     if king_pos and game.is_in_check(game.turn):
         board_r, board_c = king_pos
@@ -105,14 +112,18 @@ def draw_chess_board_pil(piece_images):
         
     return img
 
-def handle_chess_click(coords):
+def get_click_board_coords(coords):
+    """Helper function to convert x,y click to board (r, c)"""
     SQUARE_SIZE, BORDER_SIZE = 80, 25
+    if not coords:
+        return None
+        
     draw_c = (coords['x'] - BORDER_SIZE) // SQUARE_SIZE
     draw_r = (coords['y'] - BORDER_SIZE) // SQUARE_SIZE
 
     player_color = st.session_state.get('player_color', 'white')
 
-    # Convert screen coordinates to board coordinates based on player perspective
+    # Convert screen coordinates to board coordinates
     if player_color == 'black':
         r = 7 - draw_r
         c = 7 - draw_c
@@ -120,24 +131,5 @@ def handle_chess_click(coords):
         r = draw_r
         c = draw_c
     
-    pos = (r, c)
+    return (r, c)
 
-    if not (0 <= r < 8 and 0 <= c < 8) or st.session_state.chess_game.game_over:
-        return
-
-    game = st.session_state.chess_game
-    selected_piece = game.board.get_piece(st.session_state.selected_square) if st.session_state.selected_square else None
-    clicked_piece = game.board.get_piece(pos)
-
-    if selected_piece:
-        success, message = game.make_move(st.session_state.selected_square, pos)
-        st.session_state.selected_square = None 
-        if not success:
-             if clicked_piece and clicked_piece.color == game.turn:
-                 st.session_state.selected_square = pos
-             elif message != "Invalid move for this piece.":
-                 st.toast(message, icon="⚠️")
-    elif clicked_piece and clicked_piece.color == game.turn:
-        st.session_state.selected_square = pos
-    else:
-        st.session_state.selected_square = None
