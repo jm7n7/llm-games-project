@@ -1,6 +1,7 @@
 import google.generativeai as genai
 import json
 import os
+import time
 import random
 from dotenv import load_dotenv
 load_dotenv()
@@ -14,9 +15,9 @@ COMMENTATOR_KEY = os.environ.get("COMMENTATOR_KEY")
 
 # --- MODEL INITIALIZATION ---
 # Using specific models as requested by the architecture
-commentator_model = genai.GenerativeModel('gemini-2.5-flash-lite-preview-09-2025')
-coach_model = genai.GenerativeModel('gemini-2.5-flash-lite')
-opponent_model = genai.GenerativeModel('gemini-2.5-flash')
+commentator_model = genai.GenerativeModel('gemini-2.5-flash-lite-preview-09-2025') # use 2.5 flash for the final
+coach_model = genai.GenerativeModel('gemini-2.5-flash-lite') # use 2.5 pro for the final
+opponent_model = genai.GenerativeModel('gemini-2.5-flash') # use 2.5 flash for the final
 
 # --- COMMENTATOR FUNCTION (NOW ACTIVELY USED) ---
 def get_move_commentary(move_data_dict):
@@ -97,6 +98,60 @@ def get_ai_opponent_move(chat_session, game_data_history_str, legal_moves_list):
         print(f"Error calling Opponent LLM or parsing JSON: {e}")
         # Fallback move if the LLM fails
         return {"move": random.choice(legal_moves_list)}
+
+
+
+def get_ai_opponent_move_with_metrics(chat_session, game_data_history_str, legal_moves_list):
+    """
+    Wraps the existing get_ai_opponent_move to return both the parsed move and an llm_metrics dict.
+    """
+    start = time.time()
+    try:
+        parsed = get_ai_opponent_move(chat_session, game_data_history_str, legal_moves_list)
+        end = time.time()
+        latency = end - start
+
+        # Try to extract token usage if the SDK/response provides it.
+        # This depends on your genai SDK response object structure. Example attempt:
+        llm_info = {}
+        try:
+            last_resp = chat_session._last_response  # <-- if SDK exposes it; fallback below
+            usage = getattr(last_resp, "usage", None)
+            if usage:
+                llm_info["prompt_tokens"] = usage.get("prompt_tokens")
+                llm_info["response_tokens"] = usage.get("completion_tokens") or usage.get("response_tokens")
+                llm_info["total_tokens"] = usage.get("total_tokens")
+        except Exception:
+            pass
+
+        # Build metrics dict we expect log_move_data to consume
+        llm_metrics = {
+            "role": "opponent",
+            "model": getattr(opponent_model, "name", "opponent_model"),
+            "latency": latency,
+            "prompt_tokens": llm_info.get("prompt_tokens"),
+            "response_tokens": llm_info.get("response_tokens"),
+            "total_tokens": llm_info.get("total_tokens"),
+            "raw_response": None
+        }
+
+        # If parsed is a dict with raw text or chat_session has a last response text, include it
+        try:
+            llm_metrics["raw_response"] = parsed.get("_raw_text") if isinstance(parsed, dict) else None
+        except Exception:
+            pass
+
+        return parsed, llm_metrics
+
+    except Exception as e:
+        end = time.time()
+        return {"move": random.choice(legal_moves_list)}, {
+            "role":"opponent","model":"opponent_model","latency":end-start,
+            "prompt_tokens":None,"response_tokens":None,"total_tokens":None,"raw_response":f"error:{e}"
+        }
+
+
+
 
 
 # --- COACH FUNCTIONS (MODIFIED FOR NEW CONTEXT) ---

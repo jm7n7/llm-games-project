@@ -1,5 +1,7 @@
 import uuid
 import copy
+import chess
+import re
 
 class Piece:
     """Base class for all chess pieces."""
@@ -266,17 +268,32 @@ class ChessGame:
 
     def _record_move_data(self, piece, start_pos, end_pos, captured_piece, promoted_into=None):
         opponent_color = 'black' if piece.color == 'white' else 'white'
+        # file: chess_logic.py  (inside ChessGame._record_move_data)
         move_data = {
-            'game_id': self.game_id, 'turn': len(self.game_data) + 1, 'color': piece.color,
-            'piece_moved': piece.name, 'start_square': self.pos_to_notation(start_pos),
-            'end_square': self.pos_to_notation(end_pos), 'capture': 1 if captured_piece else 0,
+            'game_id': self.game_id,
+            'turn': len(self.game_data) + 1,
+            'color': piece.color,
+            'piece_moved': piece.name,
+            'start_square': self.pos_to_notation(start_pos),
+            'end_square': self.pos_to_notation(end_pos),
+            'capture': 1 if captured_piece else 0,
             'captured_piece': captured_piece.name if captured_piece else 'NA',
             'check': 1 if self.is_in_check(opponent_color) else 0,
             'checkmate': 1 if self.is_checkmate(opponent_color) else 0,
-            'promoted': 1 if promoted_into else 0, 'promoted_into': promoted_into if promoted_into else 'NA',
+            'promoted': 1 if promoted_into else 0,
+            'promoted_into': promoted_into if promoted_into else 'NA',
             'draw': 1 if "draw" in self.status_message.lower() else 0,
+            # NEW: fields for LLM metadata (filled by caller if applicable)
+            'llm_creator_role': None,        # e.g., 'opponent', 'coach', 'human', 'commentator'
+            'llm_model': None,
+            'llm_latency_seconds': None,
+            'llm_prompt_tokens': None,
+            'llm_response_tokens': None,
+            'llm_total_tokens': None,
+            'fen': None    # optional: you may want to store the FEN at move time
         }
         self.game_data.append(move_data)
+
 
     def _check_insufficient_material(self):
         pieces = [p for row in self.board.grid for p in row if p]
@@ -345,11 +362,15 @@ class ChessGame:
 
     def make_move(self, start_pos, end_pos):
         piece = self.board.get_piece(start_pos)
-        if not piece or piece.color != self.turn or self.game_over: return False, "Invalid selection."
-        if end_pos not in piece.get_valid_moves(self.board, self): return False, "Invalid move for piece."
-        if self.move_puts_king_in_check(start_pos, end_pos): return False, "Cannot move into check."
+        if not piece or piece.color != self.turn or self.game_over:
+            return False, "Invalid selection."
+        if end_pos not in piece.get_valid_moves(self.board, self):
+            return False, "Invalid move for piece."
+        if self.move_puts_king_in_check(start_pos, end_pos):
+            return False, "Cannot move into check."
 
         if isinstance(piece, King) and abs(start_pos[1] - end_pos[1]) == 2:
+            # --- Castling ---
             is_kingside = end_pos[1] > start_pos[1]
             rook_start = (start_pos[0], 7 if is_kingside else 0)
             rook_end = (start_pos[0], 5 if is_kingside else 3)
@@ -358,11 +379,14 @@ class ChessGame:
             self.board.move_piece(rook_start, rook_end)
             self.move_history.append("O-O" if is_kingside else "O-O-O")
         else:
+            # --- Pawn promotion pending ---
             if isinstance(piece, Pawn) and end_pos[0] in [0, 7]:
                 captured_piece = self.board.get_piece(end_pos)
                 self.promotion_pending = (start_pos, end_pos, captured_piece, piece)
                 self.status_message = f"{self.turn.capitalize()} to promote pawn."
                 return True, "Promotion"
+
+            # --- Normal or en passant move ---
             is_en_passant = isinstance(piece, Pawn) and end_pos == self.en_passant_target
             captured_piece = None
             if is_en_passant:
@@ -373,10 +397,21 @@ class ChessGame:
                 self.board.move_piece(start_pos, end_pos)
             else:
                 captured_piece = self.board.move_piece(start_pos, end_pos)
-            self.en_passant_target = ((start_pos[0] + end_pos[0]) // 2, start_pos[1]) if isinstance(piece, Pawn) and abs(start_pos[0] - end_pos[0]) == 2 else None
-            move_notation = f"{piece.symbol} {self.pos_to_notation(start_pos)}-{self.pos_to_notation(end_pos)}"
-            if captured_piece: move_notation += f" (captures {captured_piece.symbol})"
+
+            # --- Update en passant target ---
+            self.en_passant_target = (
+                ((start_pos[0] + end_pos[0]) // 2, start_pos[1])
+                if isinstance(piece, Pawn) and abs(start_pos[0] - end_pos[0]) == 2
+                else None
+            )
+
+            # --- Move notation (always algebraic squares) ---
+            move_notation = f"{self.pos_to_notation(start_pos)}-{self.pos_to_notation(end_pos)}"
+            if captured_piece:
+                move_notation = move_notation.replace("-", "x")  # e.g., g5xe6
             self.move_history.append(move_notation)
+
+            # --- Record metadata ---
             self._record_move_data(piece, start_pos, end_pos, captured_piece)
 
         self.turn = 'black' if self.turn == 'white' else 'white'
@@ -384,20 +419,35 @@ class ChessGame:
         self._update_game_status()
         return True, self.status_message
 
+
     def promote_pawn(self, piece_choice_str):
-        if not self.promotion_pending: return False, "No promotion pending."
+        if not self.promotion_pending:
+            return False, "No promotion pending."
         start_pos, end_pos, captured_piece, original_pawn = self.promotion_pending
         piece_map = {'Queen': Queen, 'Rook': Rook, 'Bishop': Bishop, 'Knight': Knight}
         new_piece = piece_map[piece_choice_str](self.turn, end_pos)
+
+        # Update board
         self.board.set_piece(start_pos, None)
         self.board.set_piece(end_pos, new_piece)
         self.promotion_pending = None
-        self.move_history.append(f"{self.pos_to_notation(end_pos)}={new_piece.symbol}")
+
+        # --- Move notation (promotion in UCI-friendly form) ---
+        start = self.pos_to_notation(start_pos)
+        end = self.pos_to_notation(end_pos)
+        promo_letter = piece_choice_str[0].upper()  # Q, R, B, N
+        move_notation = f"{start}-{end}={promo_letter}"
+        self.move_history.append(move_notation)
+
+        # --- Record metadata ---
         self._record_move_data(original_pawn, start_pos, end_pos, captured_piece, promoted_into=piece_choice_str)
+
+        # Switch turn
         self.turn = 'black' if self.turn == 'white' else 'white'
         self._record_position()
         self._update_game_status()
         return True, "Pawn promoted."
+
 
     def is_in_check(self, color):
         king_pos = self.board.find_king(color)
@@ -427,4 +477,66 @@ class ChessGame:
 
     def is_stalemate(self, color):
         return not self.is_in_check(color) and not self.has_legal_moves(color)
+
+
+    def get_fen(self):
+        
+        """
+        Build a FEN string by replaying self.move_history
+        with support for captures, promotions, and castling.
+        This version auto-cleans symbols like ♙♘ and (captures ♝).
+        """
+
+        board = chess.Board()
+
+        for raw_move in self.move_history:
+            if not raw_move:
+                continue
+
+            move_str = raw_move
+
+            try:
+                # --- Remove piece icons (♙♘♗♖♕♔ etc.) ---
+                move_str = re.sub(r"[♙♘♗♖♕♔♟♞♝♜♛♚]", "", move_str)
+
+                # --- Remove parenthetical notes e.g. (captures ♝) ---
+                move_str = re.sub(r"\(.*?\)", "", move_str)
+
+                move_str = move_str.strip()
+
+                # --- Handle castling ---
+                if move_str in ["O-O", "0-0"]:
+                    uci = "e1g1" if board.turn == chess.WHITE else "e8g8"
+                elif move_str in ["O-O-O", "0-0-0"]:
+                    uci = "e1c1" if board.turn == chess.WHITE else "e8c8"
+                else:
+                    # --- Handle captures (replace x with - for consistency) ---
+                    move_str = move_str.replace("x", "-")
+
+                    # --- Handle promotions (e7-e8=Q → e7e8q) ---
+                    promo_piece = None
+                    if "=" in move_str:
+                        sq, promo = move_str.split("=")
+                        move_str = sq
+                        promo_piece = promo.lower()
+
+                    # Normalize e2-e4 → e2e4
+                    uci = move_str.replace("-", "")
+
+                    if promo_piece:
+                        uci += promo_piece
+
+                # Try pushing to board
+                move = chess.Move.from_uci(uci)
+                if move in board.legal_moves:
+                    board.push(move)
+                else:
+                    print(f"[WARN] Illegal or unparsed move: {raw_move} → {uci}")
+
+            except Exception as e:
+                print(f"[ERROR] Could not parse move: {raw_move}, error: {e}")
+
+        return board.fen()
+
+
 

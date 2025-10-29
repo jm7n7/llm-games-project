@@ -9,6 +9,7 @@ from streamlit_image_coordinates import streamlit_image_coordinates
 from chess_app_functions import *
 import os
 import time
+from game_file_logger import log_move_data
 
 #--- PAGE CONFIG --
 st.set_page_config(
@@ -233,9 +234,11 @@ elif phase in ['playing', 'awaiting_user_decision']:
                     st.session_state.selected_square = None
                     
                     if success and message != "Promotion":
-                        # Move was successful, proceed to LLM processing
+                        # Start timer for this human move
+                        st.session_state.move_start_time = time.time()
                         st.session_state.chess_game_phase = 'processing_llms'
                         st.rerun()
+
                     elif not success:
                         # Move failed (e.g., illegal, into check)
                         game.revert_to_pre_move_state()
@@ -256,7 +259,28 @@ elif phase == 'processing_llms':
     
     # 2. Call Commentator to get simple text
     last_move_commentary = ll_api.get_move_commentary(last_move_data)
-    
+
+    start = time.time()
+    last_move_commentary = ll_api.get_move_commentary(last_move_data)
+    latency = time.time() - start
+
+    # End timer for human move
+    latency_seconds = None
+    if st.session_state.get("move_start_time"):
+        latency_seconds = time.time() - st.session_state.move_start_time
+        st.session_state.move_start_time = None
+
+    log_move_data(
+        game_id=game.game_id,
+        move_number=last_move_data['turn'],
+        color=last_move_data['color'],
+        move=f"{last_move_data['start_square']}-{last_move_data['end_square']}",
+        fen=game.get_fen(),
+        latency=latency_seconds
+    )
+
+
+
     # 3. Get full game history for both LLMs
     game_history_json_str = json.dumps(game.game_data)
     
@@ -285,6 +309,7 @@ elif phase == 'processing_llms':
         st.session_state.chess_game_phase = 'playing'
         st.rerun()
 
+
 elif phase == 'processing_chat_message':
     # --- This phase runs when the user asks a Q&A question ---
     
@@ -303,6 +328,8 @@ elif phase == 'processing_chat_message':
     st.session_state.stream_type = 'chat'
     st.session_state.chess_game_phase = 'streaming_coach_response'
     st.rerun()
+
+
 
 elif phase == 'streaming_coach_response':
     # --- This phase handles the *result* of the coach's streamed text ---
@@ -324,6 +351,8 @@ elif phase == 'streaming_coach_response':
     stream_type = st.session_state.get('stream_type', 'analysis')
     st.session_state.stream_type = None # Consume the type
 
+    # ⚠️ Removed CSV logging here
+
     if stream_type == 'analysis': # Response to human move
         if final_commentary.startswith("[INTERVENTION]"):
             cleaned_commentary = final_commentary.replace("[INTERVENTION]", "").strip()
@@ -337,15 +366,17 @@ elif phase == 'streaming_coach_response':
     elif stream_type == 'ai_analysis': # Response to AI move
         if final_commentary and final_commentary != "...":
             st.session_state.chat_history.append({"role": "coach", "text": final_commentary})
-        st.session_state.chess_game_phase = 'playing' # NOW the user can play
+        st.session_state.chess_game_phase = 'playing'
         
     elif stream_type == 'chat': # Response to Q&A
         st.session_state.chat_history.append({"role": "coach", "text": final_commentary})
         st.session_state.chess_game_phase = st.session_state.get('return_phase', 'playing')
         st.session_state.return_phase = None
     
-    st.session_state.coach_stream_data = None # Clear stream data
+    st.session_state.coach_stream_data = None
     st.rerun()
+
+
 
 elif phase == 'processing_ai_move':
     # This phase now has two parts:
@@ -366,6 +397,23 @@ elif phase == 'processing_ai_move':
         # Get AI move commentary
         ai_move_data = game.game_data[-1]
         ai_move_commentary = ll_api.get_move_commentary(ai_move_data)
+
+
+        # End timer for AI move
+        latency_seconds = None
+        if st.session_state.get("ai_move_start_time"):
+            latency_seconds = time.time() - st.session_state.ai_move_start_time
+            st.session_state.ai_move_start_time = None
+
+        log_move_data(
+            game_id=game.game_id,
+            move_number=ai_move_data['turn'],
+            color=ai_move_data['color'],
+            move=f"{ai_move_data['start_square']}-{ai_move_data['end_square']}",
+            fen=game.get_fen(),
+            latency=latency_seconds
+            )
+
         
         # Get full history
         game_history_json_str = json.dumps(game.game_data)
@@ -406,12 +454,12 @@ elif phase == 'processing_ai_move':
             chat_session = ll_api.initialize_opponent_chat()
 
         if legal_moves_list:
-            # Call Opponent LLM
-            ai_response = ll_api.get_ai_opponent_move(
-                chat_session, game_history_json_str, legal_moves_list
-            )
-            # Store the move. The rerun will trigger PART 2 of this phase.
-            st.session_state.pending_ai_move = ai_response['move']
+            st.session_state.ai_move_start_time = time.time()
+            parsed, ai_llm_metrics = ll_api.get_ai_opponent_move_with_metrics(chat_session, game_history_json_str, legal_moves_list)
+            st.session_state.pending_ai_move = parsed['move']
+            st.session_state.ai_llm_metrics = ai_llm_metrics
+
+
         else:
             # No legal moves, game is over.
             st.session_state.chess_game_phase = 'playing'
