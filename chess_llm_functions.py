@@ -262,4 +262,3 @@ def get_coach_qa_response(chat_session, user_query, board_state_narrative):
             yield _MockChunk(json.dumps(fallback_json))
         
         return fallback_stream()
-
