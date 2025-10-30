@@ -679,4 +679,3 @@ class ChessGame:
     def is_stalemate(self, color):
         """Checks if the given color is in stalemate."""
         return not self.is_in_check(color) and not self.has_legal_moves(color)
-
