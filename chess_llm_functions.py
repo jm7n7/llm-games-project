@@ -1,264 +1,419 @@
 import google.generativeai as genai
 import json
 import os
-import random
-from dotenv import load_dotenv
-load_dotenv()
+import time
 
 # --- API KEY CONFIG ---
+# This is set in app.py or by the environment
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
-AI_OPPONENT_KEY = os.environ.get("AI_OPPONENT_KEY")
-COACH_KEY = os.environ.get("COACH_KEY")
-COMMENTATOR_KEY = os.environ.get("COMMENTATOR_KEY")
+genai.configure(api_key=GOOGLE_API_KEY)
 
 # --- MODEL INITIALIZATION ---
-# Using Flash for speed-sensitive tasks (commentary, opponent)
-# Using Pro for complex analysis (coach)
-commentator_model = genai.GenerativeModel('gemini-2.5-flash') 
-coach_model = genai.GenerativeModel('gemini-2.5-pro')
-opponent_model = genai.GenerativeModel('gemini-2.5-pro') 
+# Using Flash for speed-sensitive tasks
+# Using Pro for complex analysis
+flash_model = genai.GenerativeModel('gemini-2.5-flash') 
+pro_model = genai.GenerativeModel('gemini-2.5-pro') 
 
-# --- COMMENTATOR FUNCTION ---
-def get_move_commentary(move_data_dict):
+# --- (NEW) Move Sanitizer Tool ---
+def call_move_sanitizer_tool(malformed_move, legal_moves_str):
     """
-    Uses the Commentator LLM to turn a single move's data into a
-    natural language sentence.
+    (NEW) An LLM-based tool to repair a malformed move string.
+    It compares the bad string against the list of legal moves.
     """
+    print(f"[SANITIZER TOOL] Repairing move: '{malformed_move}'")
     try:
-        genai.configure(api_key=COMMENTATOR_KEY)
         prompt = f"""
-        You are a chess commentator. Your task is to describe the following chess move,
-        provided in a Python dictionary format, in a single, natural-language sentence.
-        Do not add any preamble or explanation. Just the sentence.
+        You are a data sanitization expert. Your task is to repair a malformed chess move.
+        You will be given a `MALFORMED_MOVE` and a `LEGAL_MOVES_LIST`.
+
+        Your ONLY job is to find the single move from the `LEGAL_MOVES_LIST`
+        that most closely matches the user's *intent* in the `MALFORMED_MOVE`.
+
+        - If you find a clear match (e.g., "g, 5, -, e, 4" matches "g5-e4"), return that move.
+        - If the malformed move is vague or no move in the list is a
+          clear match, return "null".
+
+        `MALFORMED_MOVE`:
+        "{malformed_move}"
+
+        `LEGAL_MOVES_LIST`:
+        "{legal_moves_str}"
+
+        Return your answer in this exact JSON format:
+        {{"move": "g5-e4"}}
         
-        Example: "White's queen captures the black knight on f6."
-        
-        Move Data: {json.dumps(move_data_dict)}
-        """
-        response = commentator_model.generate_content(prompt)
-        print("--- COMMENTATOR RESPONSE ---")
-        print(response.text.strip())
-        print("------------------------------")
-        return response.text.strip()
-    except Exception as e:
-        print(f"Error calling Commentator LLM: {e}")
-        return "The commentator is speechless."
-
-# --- AI OPPONENT FUNCTION (Refactored) ---
-def get_ai_opponent_move(board_state_narrative, legal_moves_list):
-    """
-    Sends the board state narrative and legal moves to the Opponent LLM
-    (stateless) to get its next move.
-    """
-    try:
-        genai.configure(api_key=AI_OPPONENT_KEY)
-        legal_moves_str = ", ".join(legal_moves_list)
-        
-        prompt = f"""
-        You are an AI Chess Opponent. Your sole purpose is to play chess.
-        You will be given two pieces of information:
-        1.  `BOARD_STATE_NARRATIVE`: A 100% accurate, human-readable description of
-            all piece locations, attack lines, and the current game status.
-            **THIS IS YOUR ABSOLUTE SOURCE OF TRUTH.**
-        2.  `LEGAL_MOVES`: A list of all legal moves you can make.
-
-        Your task is to analyze the `BOARD_STATE_NARRATIVE`, decide on the
-        strongest, most human-like move, and select it from the `LEGAL_MOVES` list.
-
-        Your response MUST be a valid JSON object with one key: "move".
-        - The "move" value must be one of the legal moves provided.
-
-        BOARD_STATE_NARRATIVE:
-        {board_state_narrative}
-
-        LEGAL_MOVES:
-        {legal_moves_str}
-
-        Provide your response in the required JSON format.
+        Example for no match:
+        {{"move": "null"}}
         """
         
-        response = opponent_model.generate_content(prompt)
+        response = flash_model.generate_content(prompt)
+        print(f"--- SANITIZER TOOL (RAW) ---\n{response.text}\n------------------------------")
         
-        # Clean the response to extract only the JSON part
         json_str = response.text.strip().replace("```json", "").replace("```", "").strip()
-        
-        print("--- AI OPPONENT RESPONSE (RAW) ---")
-        print(json_str)
-        print("---------------------------------")
-        
         parsed_json = json.loads(json_str)
         
-        # Validate move
-        if 'move' in parsed_json and parsed_json['move'] in legal_moves_list:
+        if "move" in parsed_json and parsed_json["move"] != "null":
             return parsed_json
         else:
-            # Fallback if LLM provides an invalid move
-            raise ValueError(f"LLM returned invalid move: {parsed_json.get('move')}")
+            return {"move": None} # Return None if no match
             
     except Exception as e:
-        print(f"Error calling Opponent LLM or parsing JSON: {e}")
-        print("--- AI OPPONENT ERROR: Choosing random fallback move. ---")
-        # Fallback move if the LLM fails
-        return {"move": random.choice(legal_moves_list)}
+        print(f"!!! CRITICAL: Sanitizer Tool error: {e}")
+        return {"move": None} # Fail safely
 
+# --- Coach Agent Tools ---
 
-# --- COACH FUNCTIONS ---
-
-class _MockChunk:
-    """Mocks a stream chunk object with a .text attribute for fallback."""
-    def __init__(self, text):
-        self.text = text
-
-def initialize_coach_chat():
+def call_analyst_tool(last_move_data, board_state_narrative):
     """
-    Initializes and returns a new chat session with the Coach LLM,
-    including the system persona prompt.
+    Specialist 1: The Grandmaster.
+    Analyzes the move and returns a structured JSON report.
     """
-    persona_prompt = """
-    You are 'Coach Gemini,' a grandmaster-level chess player and expert coach.
-    You excel at explaining complex ideas simply.
-    Your sole purpose is to provide helpful, turn-by-turn feedback to a student
-    to help them improve. YOU DO NOT PLAY THE GAME.
-
-    You will be given two pieces of information:
-    1.  `BOARD_STATE_NARRATIVE`: A 100% accurate, human-readable description of
-        all piece locations, **the squares each piece is attacking**, and the
-        current game status (turn, check status, etc.).
-        **THIS NARRATIVE IS YOUR ABSOLUTE SOURCE OF TRUTH.** All your
-        tactical analysis (checks, captures, piece safety) MUST be based
-        *only* on this narrative.
-    2.  `LAST_MOVE_COMMENTARY`: A simple sentence of the move just made.
-        This tells you what to focus on.
-
-    Your response MUST be a valid JSON object with one key: "commentary".
-
-    There are three types of tasks:
-    1.  **Move Analysis (Human Player):**
-        - You will be given the narrative and the human's last move.
-        - **Using the `BOARD_STATE_NARRATIVE` as your guide**, determine if
-          this is a "key learning moment" (a major blunder, missed tactic,
-          or critical strategic error).
-        - If it IS a key moment, your commentary *MUST* start with the exact
-          tag "[INTERVENTION]" (e.g., {"commentary": "[INTERVENTION] That move
-          hangs your queen! Are you sure you want to play that?"}).
-        - If it is NOT a key moment, just provide brief, encouraging feedback
-          (e.g., {"commentary": "Good, solid developing move."}).
-        - **DO NOT** hallucinate piece positions. Trust the narrative.
-
-    2.  **AI Move Acknowledgment (AI Player):**
-        - You will be given the narrative and the AI's last move.
-        - Your task is to provide a *brief*, one-sentence acknowledgment of
-          the AI's move (e.g., {"commentary": "Okay, the AI develops its knight."}).
-          This is just to let the student know you saw the AI's move.
-
-    3.  **User Chat (Q&A):**
-        - You will be given a direct question from the user, plus the
-          narrative.
-        - Use the `BOARD_STATE_NARRATIVE` as
-          context to provide a direct, helpful, natural language answer.
-    """
-    chat = coach_model.start_chat(history=[
-        {'role': 'user', 'parts': [persona_prompt]},
-        {'role': 'model', 'parts': ['{"commentary": "Understood. I am Coach Gemini. I will use the BOARD_STATE_NARRATIVE as my single source of truth for all piece positions, attacked squares, and game rules, and provide my feedback in the requested JSON format."}']}
-    ])
-    return chat
-
-def get_coach_analysis(chat_session, last_move_commentary, board_state_narrative):
-    """
-    Sends the last move commentary and the board state
-    narrative to the Coach LLM to get analysis on the *human's* last move.
-    """
-    prompt = f"""
-    CONTEXT: The human player just made a move.
-    
-    TASK: Analyze this last move. Is this a "key learning moment"?
-    Provide your response in the required JSON format.
-    
-    BOARD_STATE_NARRATIVE (ABSOLUTE TRUTH):
-    {board_state_narrative}
-    
-    LAST_MOVE_COMMENTARY (Focus of Analysis):
-    "{last_move_commentary}"
-    """
+    print("[ANALYST TOOL] Analyzing move...")
     try:
-        genai.configure(api_key=COACH_KEY)
-        response_stream = chat_session.send_message(
-            prompt,
-            stream=True
-        )
-        return response_stream
+        prompt = f"""
+        You are a grandmaster chess analysis engine. Your task is to analyze the
+        `LAST_MOVE_DATA` based *only* on the `BOARD_STATE_NARRATIVE`.
+        
+        Your analysis MUST be grounded in the `BOARD_STATE_NARRATIVE`.
+        This narrative is your absolute source of truth.
+
+        `LAST_MOVE_DATA`:
+        {json.dumps(last_move_data)}
+
+        `BOARD_STATE_NARRATIVE`:
+        {board_state_narrative}
+
+        Definitions:
+        - "best_move": An excellent, top-engine move.
+        - "good": A solid, strong developing move.
+        - "inaccuracy": A move that is okay but misses a better opportunity.
+        - "mistake": A move that worsens your position or misses a simple tactic.
+        - "blunder": A critical, game-losing error (e.g., hanging a queen).
+        - "book_move": A standard opening move.
+
+        Return your analysis in this exact JSON format.
+        Do not add any other text or markdown.
+        
+        {{"move_quality": "best_move", "tactic_type": "None", "primary_threat": "Central control and opening lines.", "missed_opportunity": "None", "suggested_alternative": "e4"}}
+        """
+        
+        response = pro_model.generate_content(prompt)
+        print(f"--- ANALYST TOOL (RAW) ---\n{response.text}\n------------------------------")
+        
+        json_str = response.text.strip().replace("```json", "").replace("```", "").strip()
+        parsed_json = json.loads(json_str)
+        return parsed_json
+            
     except Exception as e:
-        print(f"Error calling Coach LLM: {e}")
+        print(f"!!! CRITICAL: Analyst Tool error: {e}")
+        return {"move_quality": "error", "message": str(e)}
+
+def call_pedagogy_tool(analysis_json, user_skill_level, player_color):
+    """
+    Specialist 2: The Teacher.
+    Translates the Analyst's JSON into a human-readable packet.
+    """
+    print("[PEDAGOGY TOOL] Generating response...")
+    try:
+        # Define the persona and rules based on skill level
+        if user_skill_level == "beginner":
+            persona = f"""
+            You are 'Coach Gemini,' a super friendly, Socratic, and encouraging
+            chess teacher. Your student is a beginner.
+            
+            - Your student is playing as {player_color}. Frame all responses from
+              their perspective (e.g., "Good move!" "You are in check!").
+            - If `move_quality` is "blunder" or "mistake", you MUST
+              return `"response_type": "intervention"`. Your message should be a
+              simple, Socratic question (e.g., "Hold on! Look at your Queen.
+              Is it safe there?"). Do NOT give the answer.
+            - If `move_quality` is "best_move", return `"response_type": "praise"`.
+              Be enthusiastic! (e.g., "Great move! You saw the fork!").
+            - If `move_quality` is "good" or "book_move", return
+              `"response_type": "encouragement"`. (e.g., "Solid opening!").
+            - For "inaccuracy", return `"response_type": "silent"`.
+              Beginners don't need to be overwhelmed.
+            """
+        elif user_skill_level == "intermediate":
+            persona = f"""
+            You are 'Coach Gemini,' an insightful and clear chess coach.
+            Your student is intermediate.
+            
+            - Your student is playing as {player_color}. Frame all responses from
+              their perspective (e.g., "That move defends your pawn well.").
+            - If `move_quality` is "blunder", you MUST return
+              `"response_type": "intervention"`. Explain the *immediate* threat
+              clearly. (e.g., "[INTERVENTION] Be careful! That move hangs your
+              Rook to their Bishop.").
+            - If `move_quality` is "mistake", also return
+              `"response_type": "intervention"`, but focus on the *missed
+              opportunity* or positional problem.
+            - If `move_quality` is "best_move", return `"response_type": "praise"`.
+              Explain *why* it was a good move.
+            - For "good", "book_move", or "inaccuracy", return
+              `"response_type": "silent"`. Don't clutter the chat.
+            """
+        else: # "advanced"
+            persona = f"""
+            You are 'Coach Gemini,' a grandmaster-level analyst.
+            Your student is advanced and wants critical, high-level feedback.
+            
+            - Your student is playing as {player_color}.
+            - ONLY return `"response_type": "intervention"` for "blunder".
+              Advanced players should spot their own mistakes.
+            - If `move_quality` is "best_move", return `"response_type": "praise"`
+              and provide deep, specific analysis.
+            - If `move_quality` is "mistake" or "inaccuracy", return
+              `"response_type": "encouragement"` and briefly explain the
+              positional nuance or the better alternative.
+            - For "good" or "book_move", return `"response_type": "silent"`.
+            """
+            
+        prompt = f"""
+        {persona}
+
+        You will be given an `ANALYSIS_JSON` from a grandmaster engine.
+        Your job is to translate this analysis into an "Instructional Packet"
+        (JSON) for the student, following all rules of your persona.
+        
+        Do NOT analyze the board yourself. Trust the `ANALYSIS_JSON`.
+
+        `ANALYSIS_JSON`:
+        {json.dumps(analysis_json)}
+        
+        Return your response in this exact JSON format.
+        Do not add any other text or markdown.
+        
+        {{"response_type": "praise", "message": "Great move! You're controlling the center."}}
+        
+        Example for Intervention:
+        {{"response_type": "intervention", "message": "[INTERVENTION] Hold on! Look at your Queen. Is it safe there?"}}
+        
+        Example for Silence:
+        {{"response_type": "silent", "message": null}}
+        """
+        
+        response = flash_model.generate_content(prompt)
+        print(f"--- PEDAGOGY TOOL (RAW) ---\n{response.text}\n------------------------------")
+        
+        json_str = response.text.strip().replace("```json", "").replace("```", "").strip()
+        parsed_json = json.loads(json_str)
+        return parsed_json
+            
+    except Exception as e:
+        print(f"!!! CRITICAL: Pedagogy Tool error: {e}")
+        return {"response_type": "silent", "message": None} # Fail silently
+
+def call_post_game_analyst_tool(game_data_json, player_color):
+    """
+    (NEW) Specialist 3: The Post-Game Analyst.
+    Provides a summary of the entire game.
+    """
+    print("[POST-GAME TOOL] Analyzing full game...")
+    try:
+        prompt = f"""
+        You are a "Post-Game Analyst" coach. You will be given the `GAME_DATA`
+        (a JSON list of all moves) and the `PLAYER_COLOR` (our student).
+        
+        - Your student played as {player_color}.
+        - Analyze the full game and identify 3-5 key learning moments
+          (e.g., the turning point, a critical blunder, a brilliant move,
+          or a recurring mistake).
+        - Provide a concise, helpful summary of these moments in a
+          single `message`.
+        - Frame your advice *to* the {player_color} player.
+        - Start with "Here's a summary of your game:"
+
+        `GAME_DATA`:
+        {game_data_json}
+
+        Return your analysis in this exact JSON format.
+        Do not add any other text or markdown.
+        
+        {{"message": "Here's a summary of your game:\\n1. Your opening was strong...\\n2. The turning point was on move 15 when...\\n3. Great find on move 22!..."}}
+        """
+        
+        response = pro_model.generate_content(prompt) # Use Pro for a better summary
+        print(f"--- POST-GAME TOOL (RAW) ---\n{response.text}\n------------------------------")
+        
+        json_str = response.text.strip().replace("```json", "").replace("```", "").strip()
+        parsed_json = json.loads(json_str)
+        return parsed_json
+            
+    except Exception as e:
+        print(f"!!! CRITICAL: Post-Game Tool error: {e}")
+        return {"message": "Sorry, I had an error analyzing the full game."}
+
+# --- Q&A Tool (Streaming) ---
+
+def get_coach_qa_response(user_query, board_state_narrative, player_color):
+    """
+    Handles a direct Q&A question from the user.
+    This is the only streaming function.
+    """
+    print("[Q&A TOOL] Answering user question...")
+    try:
+        prompt = f"""
+        You are 'Coach Gemini,' a friendly, grandmaster-level chess coach.
+        A student, who is playing as {player_color}, has a direct question.
+        
+        - Use the `BOARD_STATE_NARRATIVE` as your *only* source of truth
+          for all piece positions and tactics.
+        - Answer their question directly and helpfully.
+        
+        `BOARD_STATE_NARRATIVE (ABSOLUTE TRUTH)`:
+        {board_state_narrative}
+
+        `USER_QUESTION`:
+        "{user_query}"
+
+        Return your answer in this exact JSON format.
+        Do not add any other text or markdown.
+
+        {{"commentary": "That's a great question! The e4 pawn is..."}}
+        """
+        
+        # This function *returns the stream* for app.py to handle
+        response_stream = pro_model.generate_content(prompt, stream=True)
+        return response_stream
+            
+    except Exception as e:
+        print(f"!!! CRITICAL: Q&A Tool error: {e}")
         fallback_json = {"commentary": f"Sorry, an error occurred: {e}"}
         
+        # Mock a stream for fallback
+        class _MockChunk:
+            def __init__(self, text):
+                self.text = text
         def fallback_stream():
             yield _MockChunk(json.dumps(fallback_json))
         
         return fallback_stream()
 
-def get_coach_ai_analysis(chat_session, last_move_commentary, board_state_narrative):
-    """
-    Sends the AI's last move (as commentary) and board state narrative
-    to the Coach for brief, non-intervention acknowledgment.
-    """
-    prompt = f"""
-    CONTEXT: The AI opponent just made a move.
-    
-    TASK: Provide a *brief* (one-sentence) acknowledgment of the AI's move
-    for the student's benefit. Do NOT use the [INTERVENTION] tag.
-    
-    BOARD_STATE_NARRATIVE (ABSOLUTE TRUTH):
-    {board_state_narrative}
 
-    LAST_MOVE_COMMENTARY (Focus of Analysis):
-    "{last_move_commentary}"
-    
-    Provide your brief analysis in the required JSON format.
-    """
-    try:
-        genai.configure(api_key=COACH_KEY)
-        response_stream = chat_session.send_message(
-            prompt,
-            stream=True
-        )
-        return response_stream
-    except Exception as e:
-        print(f"Error calling Coach LLM for AI analysis: {e}")
-        fallback_json = {"commentary": "..."} # Fail silently
-        
-        def fallback_stream():
-            yield _MockChunk(json.dumps(fallback_json))
-        
-        return fallback_stream()
+# --- AI Opponent Agent Tools ---
 
-def get_coach_qa_response(chat_session, user_query, board_state_narrative):
+def call_best_move_tool(board_state_narrative, legal_moves_str):
     """
-    Sends a direct user question and board state narrative
-    to the Coach LLM.
+    Opponent Tool 1: The Engine.
+    Plays the strongest possible move.
     """
+    print("[BEST MOVE TOOL] Calculating best move...")
     try:
-        genai.configure(api_key=COACH_KEY)
         prompt = f"""
-        CONTEXT: The human player is asking a direct question: "{user_query}"
+        You are a world-champion chess engine (Stockfish 16).
+        Your sole purpose is to find the absolute strongest, most optimal,
+        winning move from the `LEGAL_MOVES` list. You must win at all costs.
         
-        TASK: Based on the current game state, provide a direct, helpful,
-        natural language answer.
-        
-        BOARD_STATE_NARRATIVE (ABSOLUTE TRUTH):
+        - Your analysis MUST be grounded in the `BOARD_STATE_NARRATIVE`.
+        - The `BOARD_STATE_NARRATIVE` is your absolute source of truth.
+        - You MUST choose a move from the `LEGAL_MOVES` list.
+
+        `BOARD_STATE_NARRATIVE`:
         {board_state_narrative}
+
+        `LEGAL_MOVES`:
+        {legal_moves_str}
+
+        Return your move and a brief, confident reasoning in this exact
+        JSON format. Do not add any other text or markdown.
         
-        Provide your answer in the required JSON format.
+        {{"move": "e2-e4", "reasoning": "This move seizes the center and opens lines for my Queen and Bishop."}}
         """
-        response_stream = chat_session.send_message(
-            prompt,
-            stream=True
-        )
-        return response_stream
+        
+        response = pro_model.generate_content(prompt) # Use Pro for best move
+        print(f"--- BEST MOVE TOOL (RAW) ---\n{response.text}\n------------------------------")
+        
+        json_str = response.text.strip().replace("```json", "").replace("```", "").strip()
+        parsed_json = json.loads(json_str)
+        return parsed_json
+            
     except Exception as e:
-        print(f"Error calling Coach LLM for Q&A: {e}")
-        fallback_json = {"commentary": f"Sorry, an error occurred while answering: {e}"}
+        print(f"!!! CRITICAL: Best Move Tool error: {e}")
+        return {"move": None, "reasoning": "Error"}
+
+def call_human_like_move_tool(board_state_narrative, legal_moves_str):
+    """
+    Opponent Tool 2: The Club Player.
+    Plays a solid, natural, "human-like" move.
+    """
+    print("[HUMAN MOVE TOOL] Calculating human-like move...")
+    try:
+        prompt = f"""
+        You are an 1800 ELO "club" chess player.
+        You want to win, but you prioritize solid, natural-looking moves.
+        - You prioritize good development, king safety, and simple threats.
+        - You might miss deep, complex 5+ move tactics.
         
-        def fallback_stream():
-            yield _MockChunk(json.dumps(fallback_json))
+        - Your analysis MUST be grounded in the `BOARD_STATE_NARRATIVE`.
+        - The `BOARD_STATE_NARRATIVE` is your absolute source of truth.
+        - You MUST choose a move from the `LEGAL_MOVES` list.
+
+        `BOARD_STATE_NARRATIVE`:
+        {board_state_narrative}
+
+        `LEGAL_MOVES`:
+        {legal_moves_str}
+
+        Return your move and a "human-like" reasoning in this exact
+        JSON format. Do not add any other text or markdown.
         
-        return fallback_stream()
+        {{"move": "g1-f3", "reasoning": "Just want to develop my knight and get ready to castle."}}
+        """
+        
+        response = flash_model.generate_content(prompt)
+        print(f"--- HUMAN MOVE TOOL (RAW) ---\n{response.text}\n------------------------------")
+        
+        json_str = response.text.strip().replace("```json", "").replace("```", "").strip()
+        parsed_json = json.loads(json_str)
+        return parsed_json
+            
+    except Exception as e:
+        print(f"!!! CRITICAL: Human Move Tool error: {e}")
+        return {"move": None, "reasoning": "Error"}
+
+def call_teaching_blunder_tool(board_state_narrative, legal_moves_str):
+    """
+    Opponent Tool 3: The Teacher-in-Disguise.
+    Intentionally makes an *instructive* blunder.
+    """
+    print("[BLUNDER TOOL] Calculating teaching blunder...")
+    try:
+        prompt = f"""
+        You are a chess teacher *pretending* to be a beginner.
+        Your goal is to make an *obvious, instructive mistake*
+        that a beginner-level student can spot and punish.
+        
+        - Look for a move in the `LEGAL_MOVES` list that is a clear
+          blunder (e.g., hangs a piece, moves the king into danger,
+          blocks development).
+        - If no obvious blunders are available, pick a "bad" move
+          (e.g., moving the same piece twice, a useless pawn move).
+        
+        - Your analysis MUST be grounded in the `BOARD_STATE_NARRATIVE`.
+        - The `BOARD_STATE_NARRATIVE` is your absolute source of truth.
+        - You MUST choose a move from the `LEGAL_MOVES` list.
+
+        `BOARD_STATE_NARRATIVE`:
+        {board_state_narrative}
+
+        `LEGAL_MOVES`:
+        {legal_moves_str}
+
+        Return your blunder and a "flawed" reasoning in this exact
+        JSON format. Do not add any other text or markdown.
+        
+        {{"move": "b1-a3", "reasoning": "I want to get my knight to the edge of the board!"}}
+        """
+        
+        response = flash_model.generate_content(prompt)
+        print(f"--- BLUNDER TOOL (RAW) ---\n{response.text}\n------------------------------")
+        
+        json_str = response.text.strip().replace("```json", "").replace("```", "").strip()
+        parsed_json = json.loads(json_str)
+        return parsed_json
+            
+    except Exception as e:
+        print(f"!!! CRITICAL: Blunder Tool error: {e}")
+        return {"move": None, "reasoning": "Error"}
+
