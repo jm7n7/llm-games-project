@@ -404,4 +404,3 @@ elif phase == 'processing_ai_move':
     
     st.session_state.chess_game_phase = 'playing'
     st.rerun()
-
