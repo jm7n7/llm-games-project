@@ -128,8 +128,8 @@ llm-games-project/
 ├── chess_logic.py              # Core chess engine (683 lines)
 ├── chess_llm_functions.py      # LLM API integration
 ├── chess_app_functions.py       # UI and rendering helpers
-├── main.py                     # Entry point (currently empty)
-├── user_tracking_architecture.py  # User analytics
+├── gemini_temporal_reasoning.py # Metrics and move prediction
+├── game_file_logger.py          # Dataset cleaning and formatting
 ├── requirements.txt             # Python dependencies
 ├── assets/                      # Chess piece images
 │   ├── w_*.png                 # White pieces
