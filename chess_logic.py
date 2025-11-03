@@ -1,5 +1,6 @@
 import uuid
 import copy
+import json # (NEW) For dumping game data
 
 class Piece:
     """Base class for all chess pieces."""
@@ -7,9 +8,11 @@ class Piece:
         self.color = color
         self.position = position
         self.has_moved = False
+        self.move_count = 0 # (NEW) For tempo tracking
         self.symbol = 'X' # Fallback symbol
         self.name = name if name else self.__class__.__name__
         self.image_name = f"{self.color[0]}_{self.__class__.__name__.lower()}.png"
+        self.value = 0 # (NEW) Base value
 
     def get_valid_moves(self, board, game=None):
         """Returns a list of valid moves for the piece."""
@@ -17,11 +20,10 @@ class Piece:
 
     def get_attack_squares(self, board):
         """
-        Returns squares this piece is attacking.
-        This default implementation will be overridden by most pieces
-        to ensure "defended" squares (with friendly pieces) are included.
+        (FIXED) Returns squares this piece is attacking,
+        including through/at friendly pieces (for defense/x-ray).
         """
-        return self.get_valid_moves(board, None) # Fallback
+        raise NotImplementedError
 
     def _is_valid_and_capturable(self, pos, board):
         """Helper to check if a position is on the board and can be moved to."""
@@ -40,6 +42,7 @@ class King(Piece):
     def __init__(self, color, position, name=None):
         super().__init__(color, position, name or "King")
         self.symbol = '♔' if color == 'white' else '♚'
+        self.value = 1000 # (NEW) Invaluable
 
     def _get_castling_moves(self, board, game):
         castling_moves = []
@@ -74,7 +77,7 @@ class King(Piece):
         return moves
     
     def get_attack_squares(self, board):
-        """Calculates all squares this King attacks (without castling)."""
+        """(FIXED) Calculates all squares this King attacks (for check/defense)."""
         moves = []
         r, c = self.position
         for dr in [-1, 0, 1]:
@@ -91,12 +94,13 @@ class Queen(Piece):
     def __init__(self, color, position, name=None):
         super().__init__(color, position, name or "Queen")
         self.symbol = '♕' if color == 'white' else '♛'
+        self.value = 9 # (NEW)
+        self.directions = [(-1, -1), (-1, 1), (1, -1), (1, 1), (-1, 0), (1, 0), (0, -1), (0, 1)] # (NEW)
 
     def get_valid_moves(self, board, game=None):
         moves = []
         r, c = self.position
-        directions = [(-1, -1), (-1, 1), (1, -1), (1, 1), (-1, 0), (1, 0), (0, -1), (0, 1)]
-        for dr, dc in directions:
+        for dr, dc in self.directions: # (MODIFIED)
             for i in range(1, 8):
                 new_pos = (r + i * dr, c + i * dc)
                 is_valid, can_capture = self._is_valid_and_capturable(new_pos, board)
@@ -107,11 +111,10 @@ class Queen(Piece):
         return moves
 
     def get_attack_squares(self, board):
-        """Calculates attack squares, including X-Ray defense."""
+        """(FIXED) Calculates attack squares, including X-Ray defense."""
         moves = []
         r, c = self.position
-        directions = [(-1, -1), (-1, 1), (1, -1), (1, 1), (-1, 0), (1, 0), (0, -1), (0, 1)]
-        for dr, dc in directions:
+        for dr, dc in self.directions: # (MODIFIED)
             for i in range(1, 8):
                 new_pos = (r + i * dr, c + i * dc)
                 nr, nc = new_pos
@@ -126,12 +129,13 @@ class Rook(Piece):
     def __init__(self, color, position, name=None):
         super().__init__(color, position, name)
         self.symbol = '♖' if color == 'white' else '♜'
+        self.value = 5 # (NEW)
+        self.directions = [(-1, 0), (1, 0), (0, -1), (0, 1)] # (NEW)
 
     def get_valid_moves(self, board, game=None):
         moves = []
         r, c = self.position
-        directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
-        for dr, dc in directions:
+        for dr, dc in self.directions: # (MODIFIED)
             for i in range(1, 8):
                 new_pos = (r + i * dr, c + i * dc)
                 is_valid, can_capture = self._is_valid_and_capturable(new_pos, board)
@@ -142,11 +146,10 @@ class Rook(Piece):
         return moves
 
     def get_attack_squares(self, board):
-        """Calculates attack squares, including X-Ray defense."""
+        """(FIXED) Calculates attack squares, including X-Ray defense."""
         moves = []
         r, c = self.position
-        directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
-        for dr, dc in directions:
+        for dr, dc in self.directions: # (MODIFIED)
             for i in range(1, 8):
                 new_pos = (r + i * dr, c + i * dc)
                 nr, nc = new_pos
@@ -161,12 +164,13 @@ class Bishop(Piece):
     def __init__(self, color, position, name=None):
         super().__init__(color, position, name)
         self.symbol = '♗' if color == 'white' else '♝'
+        self.value = 3 # (NEW)
+        self.directions = [(-1, -1), (-1, 1), (1, -1), (1, 1)] # (NEW)
 
     def get_valid_moves(self, board, game=None):
         moves = []
         r, c = self.position
-        directions = [(-1, -1), (-1, 1), (1, -1), (1, 1)]
-        for dr, dc in directions:
+        for dr, dc in self.directions: # (MODIFIED)
             for i in range(1, 8):
                 new_pos = (r + i * dr, c + i * dc)
                 is_valid, can_capture = self._is_valid_and_capturable(new_pos, board)
@@ -177,11 +181,10 @@ class Bishop(Piece):
         return moves
 
     def get_attack_squares(self, board):
-        """Calculates attack squares, including X-Ray defense."""
+        """(FIXED) Calculates attack squares, including X-Ray defense."""
         moves = []
         r, c = self.position
-        directions = [(-1, -1), (-1, 1), (1, -1), (1, 1)]
-        for dr, dc in directions:
+        for dr, dc in self.directions: # (MODIFIED)
             for i in range(1, 8):
                 new_pos = (r + i * dr, c + i * dc)
                 nr, nc = new_pos
@@ -196,6 +199,7 @@ class Knight(Piece):
     def __init__(self, color, position, name=None):
         super().__init__(color, position, name)
         self.symbol = '♘' if color == 'white' else '♞'
+        self.value = 3 # (NEW)
 
     def get_valid_moves(self, board, game=None):
         moves = []
@@ -207,7 +211,7 @@ class Knight(Piece):
         return moves
 
     def get_attack_squares(self, board):
-        """Calculates all squares this Knight attacks, including defending friendly pieces."""
+        """(FIXED) Calculates all squares this Knight attacks (for check/defense)."""
         moves = []
         r, c = self.position
         potential_moves = [(r-2, c-1), (r-2, c+1), (r+2, c-1), (r+2, c+1), (r-1, c-2), (r-1, c+2), (r+1, c-2), (r+1, c+2)]
@@ -222,6 +226,7 @@ class Pawn(Piece):
     def __init__(self, color, position, name=None):
         super().__init__(color, position, name)
         self.symbol = '♙' if color == 'white' else '♟'
+        self.value = 1 # (NEW)
 
     def get_valid_moves(self, board, game=None):
         moves = []
@@ -249,7 +254,7 @@ class Pawn(Piece):
         return moves
 
     def get_attack_squares(self, board):
-        """Calculates all squares this Pawn attacks, including defending friendly pieces."""
+        """(FIXED) Calculates all squares this Pawn attacks (for check/defense)."""
         moves = []
         r, c = self.position
         direction = -1 if self.color == 'white' else 1
@@ -282,6 +287,7 @@ class Board:
             self.set_piece(end_pos, piece)
             self.set_piece(start_pos, None)
             piece.has_moved = True
+            piece.move_count += 1 # (NEW) Increment move count
             return captured_piece
         return None
     
@@ -390,7 +396,7 @@ class ChessGame:
     def get_board_state_narrative(self):
         """
         Generates a 100% accurate, human-readable narrative of the
-        current board state for the LLMs.
+        current board state for the COACH LLM.
         """
         narrative = []
         pieces = {'white': [], 'black': []}
@@ -511,9 +517,22 @@ class ChessGame:
                         return True
         return False
 
-    def _get_all_legal_moves(self, color):
-        """Gets all legal moves (in 'e2-e4' format) for a given color."""
-        all_moves = []
+    def _get_attackers_of_square(self, pos, attacker_color):
+        """(NEW) Helper function to get a list of all pieces attacking a square."""
+        attackers = []
+        for r in range(8):
+            for c in range(8):
+                piece = self.board.get_piece((r, c))
+                if piece and piece.color == attacker_color:
+                    if pos in piece.get_attack_squares(self.board):
+                        attackers.append(piece)
+        return attackers
+
+    def _get_all_legal_moves_tuples(self, color):
+        """
+        (NEW) Internal helper to get all legal moves as (start, end, piece) tuples.
+        This is the new source of truth for all move generation.
+        """
         for r in range(8):
             for c in range(8):
                 piece = self.board.get_piece((r, c))
@@ -521,8 +540,249 @@ class ChessGame:
                     start_pos = (r, c)
                     for end_pos in piece.get_valid_moves(self.board, self):
                         if not self.move_puts_king_in_check(start_pos, end_pos):
-                            all_moves.append(f"{self.pos_to_notation(start_pos)}-{self.pos_to_notation(end_pos)}")
+                            yield (start_pos, end_pos, piece) # Yield a generator
+
+    def _get_all_legal_moves(self, color):
+        """
+        Gets all legal moves (in 'e2-e4' format) for a given color.
+        (MODIFIED) Uses the new tuple generator.
+        """
+        all_moves = []
+        for start_pos, end_pos, _ in self._get_all_legal_moves_tuples(color):
+            all_moves.append(f"{self.pos_to_notation(start_pos)}-{self.pos_to_notation(end_pos)}")
         return all_moves
+        
+    def get_tactical_threats(self, color_being_threatened):
+        """
+        (NEW) This is the "Dangers List" / "Smart Triage List" generator.
+        It scans the *current* board for threats against the given color,
+        including simple threats and pins.
+        """
+        tactical_threats = []
+        opponent_color = 'black' if color_being_threatened == 'white' else 'white'
+        
+        for r in range(8):
+            for c in range(8):
+                threatened_piece = self.board.get_piece((r, c))
+                
+                # 1. Is this one of our pieces?
+                if not threatened_piece or threatened_piece.color != color_being_threatened:
+                    continue
+                    
+                pos = (r, c)
+                
+                # 2. Is this piece attacked?
+                attackers = self._get_attackers_of_square(pos, opponent_color)
+                if not attackers:
+                    continue # Not attacked, not a threat.
+                    
+                # 3. This piece is attacked. Now check for pins.
+                is_pin = False
+                pinned_to_piece_data = None
+                
+                for attacker in attackers:
+                    # Pins only apply to sliding pieces (Queen, Rook, Bishop)
+                    if not hasattr(attacker, 'directions'):
+                        continue
+                        
+                    # Calculate direction from attacker to our piece
+                    dr = pos[0] - attacker.position[0]
+                    dc = pos[1] - attacker.position[1]
+                    
+                    # Normalize direction
+                    unit_dr = 0 if dr == 0 else dr // abs(dr)
+                    unit_dc = 0 if dc == 0 else dc // abs(dc)
+                    
+                    # If this direction isn't in the attacker's moveset, it's not a pin
+                    if (unit_dr, unit_dc) not in attacker.directions:
+                        continue
+                        
+                    # 4. Scan *past* our piece along the same line
+                    for i in range(1, 8):
+                        scan_pos = (pos[0] + i * unit_dr, pos[1] + i * unit_dc)
+                        
+                        if not (0 <= scan_pos[0] < 8 and 0 <= scan_pos[1] < 8):
+                            break # Off board
+                            
+                        scanned_piece = self.board.get_piece(scan_pos)
+                        
+                        if scanned_piece:
+                            # We hit another piece.
+                            if scanned_piece.color == color_being_threatened:
+                                # It's a friendly piece. This is a PIN!
+                                is_pin = True
+                                pinned_to_piece_data = {
+                                    "name": scanned_piece.name,
+                                    "position": self.pos_to_notation(scan_pos),
+                                    "value": scanned_piece.value
+                                }
+                            # If it's an enemy piece, it blocks the pin.
+                            # In either case, the scan along this line stops.
+                            break 
+                            
+                    if is_pin:
+                        break # Found a pin, no need to check other attackers
+
+                # 5. Build the JSON packet for this single threat
+                tactical_threats.append({
+                    "threatened_piece": {
+                        "name": threatened_piece.name,
+                        "position": self.pos_to_notation(pos),
+                        "value": threatened_piece.value
+                    },
+                    "attacking_pieces": [
+                        {"name": p.name, "position": self.pos_to_notation(p.position), "value": p.value} 
+                        for p in attackers
+                    ],
+                    "is_pin": is_pin,
+                    "pinned_to_piece": pinned_to_piece_data
+                })
+                
+        return tactical_threats
+
+    def get_all_legal_moves_with_consequences(self, color):
+        """
+        (MODIFIED) This is the new "Move Consequence Mapping" function.
+        It simulates every legal move to see what its results are
+        (captures, checks, attacks) AND checks for retaliation.
+        This is the "predictive" ground truth for the AI Opponent Agent.
+        """
+        enhanced_moves_list = []
+        opponent_color = 'black' if color == 'white' else 'white'
+
+        # Use the new tuple generator to get all legal moves
+        for start_pos, end_pos, piece in self._get_all_legal_moves_tuples(color):
+            
+            move_notation = f"{self.pos_to_notation(start_pos)}-{self.pos_to_notation(end_pos)}"
+            
+            # --- (NEW) Define the packet structure ---
+            captured_piece_on_square = self.board.get_piece(end_pos)
+            packet = {
+                "move": move_notation,
+                "moving_piece": {
+                    "name": piece.name,
+                    "value": piece.value,
+                    "previous_move_count": piece.move_count # (NEW) Add tempo data
+                },
+                "captured_piece": None,
+                "consequences": [],
+                "retaliation": [], # (NEW) For the 2-ply check
+                "creates_pin": None, # (NEW) For offensive pin check
+                "is_fork": False # (NEW) For offensive fork check
+            }
+
+            # --- Simulate Move ---
+            original_piece_has_moved = piece.has_moved # Store pre-move state
+            original_move_count = piece.move_count # (NEW) Store pre-move state
+            
+            self.board.set_piece(end_pos, piece)
+            self.board.set_piece(start_pos, None)
+            piece.has_moved = True # Temporarily set
+            piece.move_count += 1 # (NEW) Temporarily set
+            
+            # --- Analyze Consequences of the *simulated* board state ---
+            
+            # 1. Was it a capture?
+            if captured_piece_on_square:
+                packet["consequences"].append(f"Captures {captured_piece_on_square.name} on {self.pos_to_notation(end_pos)}")
+                packet["captured_piece"] = {"name": captured_piece_on_square.name, "value": captured_piece_on_square.value}
+            
+            # 2. Does the moved piece now attack anything?
+            attacked_high_value_pieces = []
+            for attack_pos in piece.get_attack_squares(self.board):
+                target = self.board.get_piece(attack_pos)
+                if target and target.color == opponent_color:
+                    packet["consequences"].append(f"Attacks {target.name} on {self.pos_to_notation(attack_pos)}")
+                    # (NEW) Track high-value attacks for fork detection
+                    if target.value >= 3: # Knight, Bishop, Rook, Queen
+                        attacked_high_value_pieces.append(target)
+            
+            # (NEW) 2a. Check for Forks
+            if len(attacked_high_value_pieces) >= 2:
+                packet["is_fork"] = True
+                
+            # 3. Does this move deliver check?
+            is_check = self.is_in_check(opponent_color)
+            if is_check:
+                packet["consequences"].append("Delivers check!")
+                # (NEW) Check if the check is *also* a high-value attack (a fork)
+                king_pos = self.board.find_king(opponent_color)
+                # Avoid double-counting if king is already in the list
+                if king_pos and king_pos not in [p.position for p in attacked_high_value_pieces]:
+                    attacked_high_value_pieces.append(self.board.get_piece(king_pos))
+            
+            # (NEW) Re-check for forks including the King
+            if len(attacked_high_value_pieces) >= 2:
+                packet["is_fork"] = True
+                
+            # 4. (NEW) Retaliation Check
+            # Is the square the piece *landed on* attacked by the opponent?
+            if self.is_square_attacked(end_pos, opponent_color):
+                # Find all pieces that are attacking that square
+                for r in range(8):
+                    for c in range(8):
+                        attacker_piece = self.board.get_piece((r, c))
+                        if attacker_piece and attacker_piece.color == opponent_color:
+                            if end_pos in attacker_piece.get_attack_squares(self.board):
+                                packet["retaliation"].append({
+                                    "name": attacker_piece.name,
+                                    "value": attacker_piece.value,
+                                    "position": self.pos_to_notation((r,c))
+                                })
+
+            # (NEW) 5. Check if this move *creates* a pin (Offensive Pin)
+            if hasattr(piece, 'directions'): # Only sliding pieces can pin
+                for dr, dc in piece.directions:
+                    # Scan along this direction from the piece's new position
+                    first_opponent_piece = None
+                    for i in range(1, 8):
+                        scan_pos = (end_pos[0] + i * dr, end_pos[1] + i * dc)
+                        
+                        if not (0 <= scan_pos[0] < 8 and 0 <= scan_pos[1] < 8):
+                            break # Off board
+                            
+                        scanned_piece = self.board.get_piece(scan_pos)
+                        
+                        if scanned_piece:
+                            if scanned_piece.color == opponent_color:
+                                if not first_opponent_piece:
+                                    first_opponent_piece = scanned_piece
+                                else:
+                                    # This is the *second* opponent piece on the line
+                                    # We have created a pin!
+                                    packet["creates_pin"] = {
+                                        "pinned_piece": {
+                                            "name": first_opponent_piece.name,
+                                            "position": self.pos_to_notation(first_opponent_piece.position),
+                                            "value": first_opponent_piece.value
+                                        },
+                                        "pinned_to_piece": {
+                                            "name": scanned_piece.name,
+                                            "position": self.pos_to_notation(scanned_piece.position),
+                                            "value": scanned_piece.value
+                                        }
+                                    }
+                                    break # Pin found, stop scanning this line
+                            else:
+                                # Hit a friendly piece, blocks the pin
+                                break
+                    if packet["creates_pin"]:
+                        break # Pin found, stop checking directions
+
+            # --- Undo Move ---
+            self.board.set_piece(start_pos, piece)
+            self.board.set_piece(end_pos, captured_piece_on_square)
+            piece.has_moved = original_piece_has_moved # Restore
+            piece.move_count = original_move_count # (NEW) Restore
+            
+            # --- Store Result ---
+            if not packet["consequences"]:
+                packet["consequences"].append("Positional move")
+                
+            enhanced_moves_list.append(packet)
+            
+        return enhanced_moves_list
+
 
     def _notation_to_pos_tuple(self, notation):
         """Converts 'e4' to (4, 4)."""
@@ -562,7 +822,17 @@ class ChessGame:
         if not piece: return False, "No piece at start square."
         if piece.color != self.turn: return False, "Not your turn."
         if self.game_over: return False, "The game is over."
-        if end_pos not in piece.get_valid_moves(self.board, self): return False, "Invalid move for this piece."
+        if end_pos not in [m[0] for m in piece.get_valid_moves(self.board, self)]:
+             # Check if the move is in the list of valid move tuples
+             # This is a fallback check in case get_valid_moves is just returning tuples
+             # A cleaner way would be to ensure get_valid_moves always returns (r,c)
+             
+             # Let's assume get_valid_moves *does* return (r,c) tuples
+             # and check the original logic
+             valid_moves_list = piece.get_valid_moves(self.board, self)
+             if end_pos not in valid_moves_list:
+                 return False, "Invalid move for this piece."
+                 
         if self.move_puts_king_in_check(start_pos, end_pos): return False, "Cannot move into check."
         
         # --- Handle Castling ---
@@ -648,6 +918,8 @@ class ChessGame:
         """
         original_piece = self.board.get_piece(start_pos)
         captured_piece = self.board.get_piece(end_pos)
+        original_has_moved = original_piece.has_moved
+        original_move_count = original_piece.move_count # (NEW) Store move count
         
         # Simulate move
         self.board.set_piece(end_pos, original_piece)
@@ -658,19 +930,24 @@ class ChessGame:
         # Undo move
         self.board.set_piece(start_pos, original_piece)
         self.board.set_piece(end_pos, captured_piece)
+        original_piece.has_moved = original_has_moved # (FIX) Restore has_moved state
+        original_piece.move_count = original_move_count # (NEW) Restore move count
         
         return in_check
 
     def has_legal_moves(self, color):
-        """Checks if the given color has any legal moves."""
-        for r in range(8):
-            for c in range(8):
-                piece = self.board.get_piece((r, c))
-                if piece and piece.color == color:
-                    for move in piece.get_valid_moves(self.board, self):
-                        if not self.move_puts_king_in_check((r, c), move):
-                            return True # Found a legal move
-        return False
+        """
+        Checks if the given color has any legal moves.
+        (MODIFIED) Uses the new tuple generator.
+        """
+        try:
+            # Get the first item from the generator.
+            # If it exists, we have a legal move.
+            next(self._get_all_legal_moves_tuples(color))
+            return True
+        except StopIteration:
+            # The generator was empty, no legal moves.
+            return False
     
     def is_checkmate(self, color):
         """Checks if the given color is in checkmate."""
@@ -679,3 +956,4 @@ class ChessGame:
     def is_stalemate(self, color):
         """Checks if the given color is in stalemate."""
         return not self.is_in_check(color) and not self.has_legal_moves(color)
+
