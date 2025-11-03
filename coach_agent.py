@@ -48,4 +48,3 @@ def get_post_game_summary(game_data_json, player_color):
 
     print("[COACH AGENT] Post-Game summary packet received.")
     return summary_packet
-

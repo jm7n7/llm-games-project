@@ -1,70 +1,67 @@
 import chess_llm_functions as llm_api
 import random
+import json
 
-def get_ai_move(board_state_narrative, legal_moves, user_skill_level):
+def get_ai_move(enhanced_moves_json, tactical_threats_json, legal_moves_list_simple, user_skill_level):
     """
     This is the main "brain" of the AI Opponent Agent.
-    It decides *what kind* of move to make (best, human, blunder)
-    based on the user's skill level, then calls the appropriate tool.
+    (NEW) It is now a "Router Agent" that first analyzes the situation,
+    then calls a specialized tool ("best", "human", or "blunder").
     
-    (MODIFIED) Implements new LLM-based move repair logic.
+    (MODIFIED) Uses "Move Consequence Mapping" ("Options List") and
+    "Tactical Threats" ("Dangers List") as the new ground truth.
     """
     print(f"[OPPONENT AGENT] AI move requested. Skill level: {user_skill_level}")
     
-    # --- 1. Weighted Choice Logic ---
-    if user_skill_level == "beginner":
-        # 60% chance of a bad move, 30% solid, 10% best
-        tool_choice = random.choices(
-            ["blunder", "human", "best"], 
-            weights=[0.6, 0.3, 0.1], k=1
-        )[0]
-        
-    elif user_skill_level == "intermediate":
-        # 15% chance of a blunder, 65% solid, 20% best
-        tool_choice = random.choices(
-            ["blunder", "human", "best"], 
-            weights=[0.15, 0.65, 0.20], k=1
-        )[0]
-        
-    else: # "advanced"
-        # 0% chance of a blunder, 40% solid, 60% best
-        tool_choice = random.choices(
-            ["blunder", "human", "best"], 
-            weights=[0.0, 0.4, 0.6], k=1
-        )[0]
+    # --- 1. (NEW) Call the Router Agent ---
+    # This call decides *which* personality to use based on high-level
+    # definitions and principles.
+    print(f"[OPPONENT AGENT] Calling Router Agent to select personality...")
+    router_packet = llm_api.call_opponent_router_agent(
+        enhanced_moves_json, 
+        tactical_threats_json, 
+        user_skill_level
+    )
     
-    print(f"[OPPONENT AGENT] Weighted choice selected: '{tool_choice}'")
+    tool_choice = router_packet.get("tool_choice")
+    if not tool_choice or tool_choice not in ["best", "human", "blunder"]:
+        print(f"!!! CRITICAL: Router Agent failed. Falling back to 'human' tool.")
+        tool_choice = "human"
+        
+    print(f"[OPPONENT AGENT] Router Agent selected: '{tool_choice}' based on reasoning: {router_packet.get('reasoning')}")
 
-    # --- 2. Call the Selected Tool ---
-    legal_moves_str = ", ".join(legal_moves) # Pass all legal moves to LLM
+    # --- 2. Call the Selected Specialist Tool ---
+    # Data is already in JSON string format from app.py
+    legal_moves_str = ", ".join(legal_moves_list_simple) # For sanitizer
+    
     packet = None
     
     if tool_choice == "best":
         print("[OPPONENT AGENT] Calling Best Move Tool...")
-        packet = llm_api.call_best_move_tool(board_state_narrative, legal_moves_str)
+        packet = llm_api.call_best_move_tool(enhanced_moves_json, tactical_threats_json)
     elif tool_choice == "blunder":
         print("[OPPONENT AGENT] Calling Teaching Blunder Tool...")
-        packet = llm_api.call_teaching_blunder_tool(board_state_narrative, legal_moves_str)
+        packet = llm_api.call_teaching_blunder_tool(enhanced_moves_json, tactical_threats_json)
     else: # "human"
         print("[OPPONENT AGENT] Calling Human-Like Move Tool...")
-        packet = llm_api.call_human_like_move_tool(board_state_narrative, legal_moves_str)
+        packet = llm_api.call_human_like_move_tool(enhanced_moves_json, tactical_threats_json)
 
     # --- 3. Validate and Return Final Packet ---
     if not packet or "move" not in packet or "reasoning" not in packet:
         print(f"!!! CRITICAL: AI Opponent Tool ({tool_choice}) failed or returned bad data.")
         print("[OPPONENT AGENT] Fallback: Choosing random move.")
-        fallback_move = random.choice(legal_moves)
+        fallback_move = random.choice(legal_moves_list_simple)
         return {
             "move": fallback_move,
             "reasoning": "I had a connection error, so I just picked a random move!",
             "move_type": "blunder" # Treat errors as blunders
         }
 
-    # (NEW) Validation Flow
+    # Validation Flow
     raw_move = packet["move"]
 
     # 1. Happy Path: Check if the raw move is legal
-    if raw_move in legal_moves:
+    if raw_move in legal_moves_list_simple:
         print(f"[OPPONENT AGENT] Raw move '{raw_move}' is legal.")
         print(f"[OPPONENT AGENT] Final move packet: {packet}")
         return {
@@ -81,7 +78,7 @@ def get_ai_move(board_state_narrative, legal_moves, user_skill_level):
     repaired_move = repaired_packet.get("move") # Will be None if it fails
 
     # 3. Check if repair was successful
-    if repaired_move and repaired_move in legal_moves:
+    if repaired_move and repaired_move in legal_moves_list_simple:
         print(f"[OPPONENT AGENT] Repair successful! Sanitized '{raw_move}' to '{repaired_move}'.")
         return {
             "move": repaired_move, # Return the *repaired* move
@@ -92,7 +89,7 @@ def get_ai_move(board_state_narrative, legal_moves, user_skill_level):
     # 4. Final Fallback: Repair failed or returned an illegal move
     print(f"!!! CRITICAL: Move repair failed. Sanitized move '{repaired_move}' is still illegal.")
     print("[OPPONENT AGENT] Fallback: Choosing random move.")
-    fallback_move = random.choice(legal_moves)
+    fallback_move = random.choice(legal_moves_list_simple)
     return {
         "move": fallback_move,
         "reasoning": f"My brain short-circuited! I wanted to play {raw_move} but it wasn't a valid move. I played a random move instead.",

@@ -132,4 +132,3 @@ def get_click_board_coords(coords):
         c = draw_c
     
     return (r, c)
-
