@@ -68,6 +68,9 @@ def init_game():
     
     # (NEW) Post-game summary state
     st.session_state.post_game_summary_done = False
+    
+    # (NEW) Pre-move context for Coach 2.0
+    st.session_state.human_context_packet = None
 
 # Check if a game needs to be initialized
 if 'chess_game' not in st.session_state:
@@ -297,6 +300,13 @@ elif phase in ['playing', 'awaiting_user_decision']:
                     st.session_state.selected_square = None
                     st.rerun()
                 else:
+                    # (NEW) Capture "Coach 2.0" context *before* the move
+                    human_context_packet = {
+                        "dangers_before": game.get_tactical_threats(game.turn),
+                        "options_before": game.get_all_legal_moves_with_consequences(game.turn)
+                    }
+                    st.session_state.human_context_packet = human_context_packet
+
                     # Attempt to make the move
                     game.store_pre_move_state() # Store state in case of take-back
                     success, message = game.make_move(selected_square, pos)
@@ -309,6 +319,7 @@ elif phase in ['playing', 'awaiting_user_decision']:
                     elif not success:
                         # Move was invalid
                         game.revert_to_pre_move_state() # Revert to before move attempt
+                        st.session_state.human_context_packet = None # Clear context
                         if clicked_piece and clicked_piece.color == game.turn:
                             st.session_state.selected_square = pos
                         st.rerun()
@@ -321,14 +332,16 @@ elif phase == 'processing_llms':
     # --- This phase runs after a *human* move is completed ---
     # This phase calls BOTH agents in parallel.
     
-    # 1. Get data for the Coach Agent
+    # 1. Get data for the Coach Agent (Coach 2.0)
     last_move_data = game.game_data[-1]
-    board_state_narrative = game.get_board_state_narrative() # Passive narrative
-
+    human_context = st.session_state.human_context_packet
+    
     # (NEW) Print the ground truth narrative for debugging
     print("\n" + "="*50)
-    print("--- [GROUND TRUTH] COACH NARRATIVE ---")
-    print(board_state_narrative)
+    print("--- [GROUND TRUTH] COACH 2.0 CONTEXT ---")
+    print(f"Dangers: {json.dumps(human_context['dangers_before'], indent=2)}")
+    print(f"Options: {len(human_context['options_before'])} legal moves found")
+    print(f"Chosen Move: {json.dumps(last_move_data, indent=2)}")
     print("="*50 + "\n")
     
     # 2. Get data for the Opponent Agent
@@ -346,11 +359,12 @@ elif phase == 'processing_llms':
     ai_move_packet = None
 
     with ThreadPoolExecutor() as executor:
-        # Submit Coach Agent
+        # Submit Coach Agent (Coach 2.0)
         coach_future = executor.submit(
             coach_agent.get_coaching_packet,
             last_move_data,
-            board_state_narrative,
+            json.dumps(human_context['dangers_before']),
+            json.dumps(human_context['options_before']),
             user_skill_level,
             player_color
         )
@@ -374,6 +388,7 @@ elif phase == 'processing_llms':
     # 4. Store packets in session state and move to next phase
     st.session_state.pending_coach_packet = instruction_packet
     st.session_state.pending_ai_packet = ai_move_packet
+    st.session_state.human_context_packet = None # Clear context packet
     st.session_state.chess_game_phase = 'processing_coach_packet'
     st.rerun()
 
@@ -439,7 +454,7 @@ elif phase == 'processing_chat_message':
     user_query = st.session_state.pending_user_query
     st.session_state.pending_user_query = None
     
-    # Get context for the Q&A tool
+    # Get context for the Q&A tool (it still uses the simple narrative)
     board_state_narrative = game.get_board_state_narrative()
     player_color = st.session_state.player_color
     

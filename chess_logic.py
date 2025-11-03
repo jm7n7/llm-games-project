@@ -396,7 +396,7 @@ class ChessGame:
     def get_board_state_narrative(self):
         """
         Generates a 100% accurate, human-readable narrative of the
-        current board state for the COACH LLM.
+        current board state for the (old) COACH LLM Q&A tool.
         """
         narrative = []
         pieces = {'white': [], 'black': []}
@@ -468,6 +468,7 @@ class ChessGame:
             'checkmate': 1 if is_checkmate else 0,
             'promoted': 1 if promoted_into else 0, 'promoted_into': promoted_into if promoted_into else 'NA',
             'draw': 0, # This will be updated by _update_game_status if true
+            'move_notation': f"{self.pos_to_notation(start_pos)}-{self.pos_to_notation(end_pos)}" # (NEW) For Coach 2.0
         }
         self.game_data.append(move_data)
 

@@ -23,8 +23,7 @@ def call_move_sanitizer_tool(malformed_move, legal_moves_str):
     print(f"[SANITIZER TOOL] Repairing move: '{malformed_move}'")
     try:
         prompt = f"""
-        You are a data sanitization expert.
-        Your task is to repair a malformed chess move.
+        You are a data sanitization expert. Your task is to repair a malformed chess move.
         You will be given a `MALFORMED_MOVE` and a `LEGAL_MOVES_LIST`.
 
         Your ONLY job is to find the single move from the `LEGAL_MOVES_LIST`
@@ -84,7 +83,7 @@ CORE_CHESS_DEFINITIONS = """
 
  5. **"Fork" (A Tactic):** When one of your pieces attacks *two or more* opponent pieces at the same time.
 
- 6. **"Pin" (A Tactic):** A situation where an attacking piece (like a Bishop) threatens an enemy piece (e.g., a Knight), which cannot move *off the line of attack* without exposing a more valuable piece (e.g., a Queen) or the King behind it.
+ 6. **"Pin" (A Tactic):** A situation where an attacking piece (like a Bishop) threatens an enemy piece (e.g., a Knight), which cannot move *off the line of attack* without exposing a more valuable piece (e.g., a Queen) or the King behind it. Traditionally, pawns are not included in this definition.
     * **"Absolute Pin":** When the piece behind is the King. Moving the pinned piece *off the line of attack* is illegal.
     * **"Relative Pin":** When the piece behind is a high-value piece (like a Queen). Moving the pinned piece *off the line of attack* can result in a "Blunder" because it results in a "Bad Trade".
     * **"Defended Pin":** When the pinned piece is defended by a friendly piece (e.g., a Knight on e4 defending a Queen on e3). This is not a critical threat, but it is still a tactical situation.
@@ -117,50 +116,77 @@ CORE_CHESS_DEFINITIONS = """
 
 # --- Coach Agent Tools ---
 
-def call_analyst_tool(last_move_data, board_state_narrative):
+def call_analyst_tool(last_move_data_json, dangers_before_json, options_before_json):
     """
-    Specialist 1: The Grandmaster.
-    Analyzes the move and returns a structured JSON report.
+    (Coach 2.0) Specialist 1: The Grandmaster.
+    Analyzes the move based on the *full context* before the move was made.
     """
-    print("[ANALYST TOOL] Analyzing move...")
+    print("[ANALYST TOOL 2.0] Analyzing move...")
     try:
         prompt = f"""
-        You are a grandmaster chess analysis engine.
-        Your task is to analyze the `LAST_MOVE_DATA` based *only* on the
-        `BOARD_STATE_NARRATIVE`.
+        You are a grandmaster chess analysis engine. Your task is to analyze
+        the human player's `CHOSEN_MOVE` based on the *full context* of the
+        board *before* they moved.
         
-        Your analysis MUST be grounded in the `BOARD_STATE_NARRATIVE`.
-        This narrative is your absolute source of truth.
+        You must strictly follow the `CORE_CHESS_DEFINITIONS`.
 
-        `LAST_MOVE_DATA`:
-        {json.dumps(last_move_data)}
+        {CORE_CHESS_DEFINITIONS}
 
-        `BOARD_STATE_NARRATIVE`:
-        {board_state_narrative}
+        `DANGERS_LIST (The "Before" Picture)`:
+        {dangers_before_json}
 
-        Definitions:
-        - "best_move": An excellent, top-engine move.
-        - "good": A solid, strong developing move.
-        - "inaccuracy": A move that is okay but misses a better opportunity.
-        - "mistake": A move that worsens your position or misses a simple tactic.
-        - "blunder": A critical, game-losing error (e.g., hanging a queen).
-        - "book_move": A standard opening move.
+        `OPTIONS_LIST (All Legal Moves & Consequences)`:
+        {options_before_json}
+        
+        `CHOSEN_MOVE (The Human's Move)`:
+        {last_move_data_json}
 
-        Return your analysis in this exact JSON format.
+        **Your Analysis Task:**
+        
+        1.  **Find the Chosen Move:** Look up the `CHOSEN_MOVE` (using its
+            'move_notation') inside the `OPTIONS_LIST`. This will show you
+            its pre-calculated consequences (captures, retaliation, etc.).
+            
+        2.  **Analyze Dangers:** Look at the `DANGERS_LIST`. Did the
+            `CHOSEN_MOVE` solve an "Urgent Crisis" (like a "Hanging Piece"
+            or "Pin")? Or did it *ignore* one?
+            
+        3.  **Analyze Opportunities:** Look at the `OPTIONS_LIST`. Was there
+            a "best" move (like a "Good Trade", "Fork", or "Pin") that the
+            human missed?
+            
+        4.  **Classify the Move:** Based on this analysis, classify the move:
+            - "best_move": A brilliant, top-engine move (e.g., found a
+                complex tactic, or was the only safe move).
+            - "good": A solid, strong developing move that solved or
+                ignored no dangers.
+            - "inaccuracy": A move that is okay but missed a much
+                better opportunity (e.g., missed a "Fork").
+            - "mistake": A move that worsens the position or misses a
+                simple tactic.
+            - "blunder": A critical, game-losing error (e.g., a "Hanging
+                Piece" or "Bad Trade", or ignoring an "Urgent Crisis").
+            - "book_move": A standard opening move.
+
+        **Return your analysis in this exact JSON format.**
         Do not add any other text or markdown.
         
-        {{"move_quality": "best_move", "tactic_type": "None", "primary_threat": "Central control and opening lines.", "missed_opportunity": "None", "suggested_alternative": "e4"}}
+        Example for a Blunder:
+        {{"move_quality": "blunder", "tactic_type": "Ignored Pin", "primary_threat": "The Queen on d8 was hanging to the Rook on d1, and this move ignored it.", "missed_opportunity": "The move Ng4-f6 would have blocked the pin.", "suggested_alternative": "Ng4-f6"}}
+        
+        Example for a Good Move:
+        {{"move_quality": "best_move", "tactic_type": "Fork", "primary_threat": "This move forks the King and Rook, winning material.", "missed_opportunity": "None", "suggested_alternative": "e5-f7"}}
         """
         
         response = pro_model.generate_content(prompt)
-        print(f"--- ANALYST TOOL (RAW) ---\n{response.text}\n------------------------------")
+        print(f"--- ANALYST TOOL 2.0 (RAW) ---\n{response.text}\n------------------------------")
         
         json_str = response.text.strip().replace("```json", "").replace("```", "").strip()
         parsed_json = json.loads(json_str)
         return parsed_json
             
     except Exception as e:
-        print(f"!!! CRITICAL: Analyst Tool error: {e}")
+        print(f"!!! CRITICAL: Analyst Tool 2.0 error: {e}")
         return {"move_quality": "error", "message": str(e)}
 
 def call_pedagogy_tool(analysis_json, user_skill_level, player_color):
@@ -178,7 +204,7 @@ def call_pedagogy_tool(analysis_json, user_skill_level, player_color):
             
             - Your student is playing as {player_color}. Frame all responses from
               their perspective (e.g., "Good move!" "You are in check!").
-            - If `move_quality` is "blunder" or "mistake", you **MUST**
+            - If `move_quality` is "blunder" or "mistake", you MUST
               return `"response_type": "intervention"`. Your message should be a
               simple, Socratic question (e.g., "Hold on! Look at your Queen.
               Is it safe there?"). Do NOT give the answer.
@@ -196,7 +222,7 @@ def call_pedagogy_tool(analysis_json, user_skill_level, player_color):
             
             - Your student is playing as {player_color}. Frame all responses from
               their perspective (e.g., "That move defends your pawn well.").
-            - If `move_quality` is "blunder", you **MUST** return
+            - If `move_quality` is "blunder", you MUST return
               `"response_type": "intervention"`. Explain the *immediate* threat
               clearly. (e.g., "[INTERVENTION] Be careful! That move hangs your
               Rook to their Bishop.").
@@ -214,7 +240,7 @@ def call_pedagogy_tool(analysis_json, user_skill_level, player_color):
             Your student is advanced and wants critical, high-level feedback.
             
             - Your student is playing as {player_color}.
-            - **ONLY** return `"response_type": "intervention"` for "blunder".
+            - ONLY return `"response_type": "intervention"` for "blunder".
               Advanced players should spot their own mistakes.
             - If `move_quality` is "best_move", return `"response_type": "praise"`
               and provide deep, specific analysis.
@@ -305,6 +331,7 @@ def get_coach_qa_response(user_query, board_state_narrative, player_color):
     """
     Handles a direct Q&A question from the user.
     This is the only streaming function.
+    (This tool still uses the simple narrative, which is fine for Q&A)
     """
     print("[Q&A TOOL] Answering user question...")
     try:
@@ -472,7 +499,7 @@ def call_best_move_tool(enhanced_legal_moves_json, tactical_threats_json):
         
         2.  **Analyze Opportunities (Offense):** If (and only if) you are not
             in an immediate crisis, scan the `OPTIONS_LIST` for a winning attack.
-            **Your Goal:** Find a forcing, *safe* tactic.
+            **Your Goal:** Find a forcing, *safe* tactic or capitalize on capturing hanging rooks, bishops, knights, or queens.
             * **Find Forcing Tactics:** Look for moves in the `OPTIONS_LIST` where `is_fork: true` or `creates_pin: true`. (These are examples; also consider "Skewers" or "Discovered Attacks").
             * **Principle of Safety (CRITICAL):** A tactic is only good if it's not a blunder itself. Before selecting a "forcing" move, you **must** check its `retaliation` list.
                 * If `retaliation` is empty, the tactic is safe.
@@ -488,8 +515,9 @@ def call_best_move_tool(enhanced_legal_moves_json, tactical_threats_json):
                 (as defined in the Core Definitions).
 
         **Your Task:**
-        Use these high-level principles to select the single best move. Your
-        `reasoning` must explain your thought process.
+        Use these high-level principles to select the single best move.
+        Weigh the credible threats and all possible offensive opportunities when deciding on which move to make.
+        Your `reasoning` must explain your thought process.
         
         Return your move and reasoning in this exact JSON format.
         
