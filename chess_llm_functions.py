@@ -23,7 +23,8 @@ def call_move_sanitizer_tool(malformed_move, legal_moves_str):
     print(f"[SANITIZER TOOL] Repairing move: '{malformed_move}'")
     try:
         prompt = f"""
-        You are a data sanitization expert. Your task is to repair a malformed chess move.
+        You are a data sanitization expert.
+        Your task is to repair a malformed chess move.
         You will be given a `MALFORMED_MOVE` and a `LEGAL_MOVES_LIST`.
 
         Your ONLY job is to find the single move from the `LEGAL_MOVES_LIST`
@@ -62,42 +63,56 @@ def call_move_sanitizer_tool(malformed_move, legal_moves_str):
         return {"move": None} # Fail safely
 
 # --- (NEW) Core Definitions (For AI Opponent) ---
-# This is the "Orchestration Level" logic you wanted.
+# This is the "Orchestration Level" logic.
 # We define it here so all opponent tools can share this context.
 CORE_CHESS_DEFINITIONS = """
 **Core Chess Definitions (Your Knowledge Base):**
 
-1.  **Piece Values:** Queen=9, Rook=5, Bishop=3, Knight=3, Pawn=1.
-2.  **"Hanging Piece" (A Blunder):** This is when you make a move and your
-    piece can be captured by an opponent's piece, but you *cannot*
-    recapture it.
-    *Example:* Moving your Knight (`f6-e4`) to a square where a Pawn or
-    Knight can capture it, and you have no other piece that can
-    recapture on that *same e4 square*. This is a *bad move* that loses
-    a piece for free.
-3.  **"Bad Trade" (A Blunder):** This is when you capture a *low-value*
-    piece (like a Pawn) with a *high-value* piece (like your Queen),
-    and the opponent can then recapture your Queen. You lose a Queen
-    for a Pawn.
-4.  **"Equal Trade":** This is when two pieces of *equal value* are
-    exchanged (e.g., your Knight captures a Knight, and they recapture).
-    This is neither good nor bad, just a decision.
-5.  **"Good Trade" (Profit):** This is when you capture a *high-value*
-    piece (like a Rook) with a *low-value* piece (like your Knight),
-    and even if they recapture, you have won material.
-6.  **"Tempo" (A Key Principle):** This is the concept of developing
-    your pieces.
-    * **"Good Tempo":** Moves that develop a *new* piece from your back
-        rank (e.g., `previous_move_count: 0`).
-    * **"Bad Tempo" (or "Loss of Tempo"):** Moving a piece that is
-        *already developed* for no good reason (e.g., moving your
-        Knight from f6 to e4 when it doesn't win material).
-7.  **"Fork" (A Tactic):** When one of your pieces attacks *two or more*
-    opponent pieces at the same time.
-8.  **"Pin" (A Tactic):** When one of your pieces (like a Bishop)
-    attacks a *lower-value* enemy piece (like a Knight), and
-    *behind* that Knight on the same line is a *higher-value*
-    enemy piece (like a Queen).
+ 1. **Piece Values:** Queen=9, Rook=5, Bishop=3, Knight=3, Pawn=1.
+
+ 2. **"Hanging Piece" (A Blunder):** This is when you make a move and your piece can be captured by an opponent's piece, but you *cannot* recapture it.
+    *Example:* Moving your Knight (`f6-e4`) to a square where a Pawn or Knight can capture it, and you have no other piece that can recapture on that *same e4 square*. This is a *bad move* that loses a piece for free.
+
+3. **"Trading Pieces":** This is when you capture a piece with another piece.
+    * **"Bad Trade" (A Blunder):** This is when you capture a *low-value* piece (like a Pawn) with a *high-value* piece (like your Queen), and the opponent can then recapture your Queen. You lose a Queen for a Pawn.
+    * **"Equal Trade":** This is when two pieces of *equal value* are exchanged (e.g., your Knight captures a Knight, and they recapture). This is neither good nor bad, just a decision.
+    * **"Good Trade" (Profit):** This is when you capture a *high-value* piece (like a Rook) with a *low-value* piece (like your Knight), and even if they recapture, you have won material.
+
+ 4. **"Tempo" (A Key Principle):** This is the concept of developing your pieces.
+    * **"Good Tempo":** Moves that develop a *new* piece from your back rank (e.g., `previous_move_count: 0`).
+    * **"Bad Tempo" (or "Loss of Tempo"):** Moving a piece that is *already developed* for no good reason (e.g., moving your Knight from f6 to e4 when it doesn't win material).
+
+ 5. **"Fork" (A Tactic):** When one of your pieces attacks *two or more* opponent pieces at the same time.
+
+ 6. **"Pin" (A Tactic):** A situation where an attacking piece (like a Bishop) threatens an enemy piece (e.g., a Knight), which cannot move *off the line of attack* without exposing a more valuable piece (e.g., a Queen) or the King behind it.
+    * **"Absolute Pin":** When the piece behind is the King. Moving the pinned piece *off the line of attack* is illegal.
+    * **"Relative Pin":** When the piece behind is a high-value piece (like a Queen). Moving the pinned piece *off the line of attack* can result in a "Blunder" because it results in a "Bad Trade".
+    * **"Defended Pin":** When the pinned piece is defended by a friendly piece (e.g., a Knight on e4 defending a Queen on e3). This is not a critical threat, but it is still a tactical situation.
+
+ 7. **"Castling" (A Special Move):** This is a special move where the King moves two squares toward a Rook, and the Rook moves to the square on the other side of the King.
+    * **Why do it?** The two main goals are 1) to move the King to a safer position away from the center of the board, and 2) to develop the Rook (bring it into the game).
+
+8. **"Early Game" (Opening):** This is the beginning of the game.
+    * **Goals:** The primary goals are to achieve "Good Tempo" by developing your Knights and Bishops, controlling the center of the board (usually e4, d4, e5, d5 squares), and "Castling" to get your King to safety.
+
+9. **"Mid Game":** This phase begins after most pieces are developed.
+    * **Goals:** The focus shifts to long-term strategy, finding "Good Trades," executing "Tactics" (like "Forks" and "Pins"), and improving your pawn structure.
+
+10. **"End Game":** This phase occurs when most pieces have been traded off the board.
+    * **Goals:** The primary goal often becomes promoting a pawn to a Queen. The King, which was kept safe in the Mid Game, now becomes a powerful attacking piece.
+
+11. **"Skewer" (A Tactic):** The opposite of a "Pin." This is when an attacking piece (like a Rook) threatens a *high-value* enemy piece (like a Queen). If the Queen moves to safety, a *lower-value* piece that was *behind* it on the same line (like a Bishop) is now exposed and can be captured.
+
+12. **"Discovered Attack" (A Tactic):** A threat created by moving one piece, which *un-blocks* an attack from a *second* piece behind it.
+    * *Example:* A Bishop on a1 is blocked by your own Knight on c3, which is aimed at the enemy King on g7. When the Knight moves (e.g., to e4), it "discovers" a check from the Bishop. This is a "Discovered Check" and is very powerful because the moving piece (the Knight) is free to capture or attack another piece at the same time.
+
+13. **"King Safety" (A Positional Principle):** The goal of keeping your King shielded from checks and mating threats. "Castling" is the main way to achieve this. This principle means you should be careful about moving the pawns in front of your castled King, as they act as a "pawn shield."
+
+14. **"Passed Pawn" (An End Game Goal):** A pawn that has no enemy pawns in front of it on its own file or on the adjacent files. This pawn is extremely dangerous because its path to promotion (becoming a Queen) is not blocked by other pawns.
+
+15. **"Doubled Pawns" (A Positional Weakness):** Two friendly pawns on the same file. They are generally considered a weakness because they cannot defend each other and are less mobile.
+
+16. **"Open File" (A Positional Goal):** A file (a vertical column, e.g., 'a' through 'h') that has no pawns from *either* side on it. Open files are like highways for Rooks and Queens, allowing them to attack deep into the opponent's territory.
 """
 
 # --- Coach Agent Tools ---
@@ -110,8 +125,9 @@ def call_analyst_tool(last_move_data, board_state_narrative):
     print("[ANALYST TOOL] Analyzing move...")
     try:
         prompt = f"""
-        You are a grandmaster chess analysis engine. Your task is to analyze the
-        `LAST_MOVE_DATA` based *only* on the `BOARD_STATE_NARRATIVE`.
+        You are a grandmaster chess analysis engine.
+        Your task is to analyze the `LAST_MOVE_DATA` based *only* on the
+        `BOARD_STATE_NARRATIVE`.
         
         Your analysis MUST be grounded in the `BOARD_STATE_NARRATIVE`.
         This narrative is your absolute source of truth.
@@ -162,7 +178,7 @@ def call_pedagogy_tool(analysis_json, user_skill_level, player_color):
             
             - Your student is playing as {player_color}. Frame all responses from
               their perspective (e.g., "Good move!" "You are in check!").
-            - If `move_quality` is "blunder" or "mistake", you MUST
+            - If `move_quality` is "blunder" or "mistake", you **MUST**
               return `"response_type": "intervention"`. Your message should be a
               simple, Socratic question (e.g., "Hold on! Look at your Queen.
               Is it safe there?"). Do NOT give the answer.
@@ -180,7 +196,7 @@ def call_pedagogy_tool(analysis_json, user_skill_level, player_color):
             
             - Your student is playing as {player_color}. Frame all responses from
               their perspective (e.g., "That move defends your pawn well.").
-            - If `move_quality` is "blunder", you MUST return
+            - If `move_quality` is "blunder", you **MUST** return
               `"response_type": "intervention"`. Explain the *immediate* threat
               clearly. (e.g., "[INTERVENTION] Be careful! That move hangs your
               Rook to their Bishop.").
@@ -198,7 +214,7 @@ def call_pedagogy_tool(analysis_json, user_skill_level, player_color):
             Your student is advanced and wants critical, high-level feedback.
             
             - Your student is playing as {player_color}.
-            - ONLY return `"response_type": "intervention"` for "blunder".
+            - **ONLY** return `"response_type": "intervention"` for "blunder".
               Advanced players should spot their own mistakes.
             - If `move_quality` is "best_move", return `"response_type": "praise"`
               and provide deep, specific analysis.
@@ -443,30 +459,27 @@ def call_best_move_tool(enhanced_legal_moves_json, tactical_threats_json):
 
         1.  **Analyze Dangers (Defense First):** Your first job is to
             analyze the `TACTICAL_THREATS_LIST`.
-            * **If `is_pin: true`:** This is a critical tactical situation.
-                You know that moving the `threatened_piece` is a
-                *catastrophic blunder* because it exposes the
-                `pinned_to_piece`. You must **discard** all moves for that
-                piece from the `OPTIONS_LIST` and instead find a move that
-                solves the pin.
-            * **If `is_pin: false`:** This is a simple threat. Is it a
-                "Hanging Piece" or a "Bad Trade"? If yes, this is an
-                *Urgent Crisis*. You must find a *safe* escape move from
-                the `OPTIONS_LIST`.
-            * **If it's just an "Equal Trade":** This is a *decision*, not
-                a crisis. You are free to ignore it if you find a
-                better *offensive* opportunity.
+            * **If `is_pin: true`:** This is a critical tactical situation. The `threatened_piece` is pinned to the `pinned_to_piece`.
+                **Your Goal:** Find the best move that *solves the pin*. Moving the `threatened_piece` is *often* a blunder because it exposes the `pinned_to_piece`.
+                You **MUST** analyze the `OPTIONS_LIST` (your ground truth) to find the solution. The `OPTIONS_LIST` *only* contains legal moves. Look for moves such as:
+                1.  A move for the `threatened_piece` that is *in* the `OPTIONS_LIST`. (This is rare, but could be capturing the pinning piece).
+                2.  A move that *blocks* the pin.
+                3.  A move that moves the `pinned_to_piece` to safety.
+            * **If `is_pin: false`:** This is a simple threat.
+                **Your Goal:** Determine if it's an *Urgent Crisis* or just a *Decision*.
+                1.  **Urgent Crisis:** Is it a "Hanging Piece" or "Bad Trade"? If yes, you must find a *safe* escape move from the `OPTIONS_LIST`.
+                2.  **Decision:** Is it just an "Equal Trade"? If yes, this is not a crisis. You are free to ignore it if you find a better *offensive* opportunity.
         
         2.  **Analyze Opportunities (Offense):** If (and only if) you are not
             in an immediate crisis, scan the `OPTIONS_LIST` for a winning attack.
-            * **Find Forcing Tactics:** Look for moves where `is_fork: true`
-                or `creates_pin: true`. These are top-tier, forcing moves.
-            * **Find "Good Trades":** Look for moves that capture a
-                high-value piece and are safe from recapture (check
-                `retaliation`).
+            **Your Goal:** Find a forcing, *safe* tactic.
+            * **Find Forcing Tactics:** Look for moves in the `OPTIONS_LIST` where `is_fork: true` or `creates_pin: true`. (These are examples; also consider "Skewers" or "Discovered Attacks").
+            * **Principle of Safety (CRITICAL):** A tactic is only good if it's not a blunder itself. Before selecting a "forcing" move, you **must** check its `retaliation` list.
+                * If `retaliation` is empty, the tactic is safe.
+                * If `retaliation` is *not* empty, you must evaluate that trade. If the `retaliation` results in a "Bad Trade" or "Hanging Piece" (based on `CORE_CHESS_DEFINITIONS`), then this tactic is a *mistake*, and you should avoid it.
 
         3.  **Prioritize "Good Tempo":** If there are no immediate dangers
-            *or* forcing opportunities, then (and only then) fall back to
+            *or* safe, forcing opportunities, then (and only then) fall back to
             solid, positional chess:
             * You must **strongly prefer** developing a new piece (a move
                 with `previous_move_count: 0`).
@@ -521,14 +534,12 @@ def call_human_like_move_tool(enhanced_legal_moves_json, tactical_threats_json):
         **Your Decision-Making Principles:**
 
         1.  **React to Dangers:** Look at the `TACTICAL_THREATS_LIST` first.
-            * **"Oh no, a Pin!" (if `is_pin: true`):** This is bad. You know
-                you can't move the piece that's pinned. You must find a
-                move from the `OPTIONS_LIST` to save the piece behind it
-                (the `pinned_to_piece`).
+            * **"Oh no, a Pin!" (if `is_pin: true`):** This is bad. The `threatened_piece` is pinned! This means it has very few legal moves. My goal is to solve this. I should **check the `OPTIONS_LIST`** to see what legal moves it *does* have (like maybe I can capture the attacker?). If it has no good moves, I must find a move from the `OPTIONS_LIST` to save the piece *behind* it (the `pinned_to_piece`).
             * **"Oh no, my piece is hanging!" (if `is_pin: false`):**
-                If you are about to make a "Hanging Piece" or "Bad Trade"
-                blunder, you must find a safe escape move from the
-                `OPTIONS_LIST`. Check its `retaliation`!
+                If I am about to make a "Hanging Piece" or "Bad Trade"
+                blunder, that's a crisis! My goal is to find a safe
+                escape move. I must check the `OPTIONS_LIST` for a move
+                where the `retaliation` is safe (not a 'Bad Trade').
             * **"It's just an 'Equal Trade'.":** You're not worried about
                 equal trades. You can ignore this if you see a good
                 developing move.
