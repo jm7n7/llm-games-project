@@ -14,9 +14,9 @@ COMMENTATOR_KEY = os.environ.get("COMMENTATOR_KEY")
 # --- MODEL INITIALIZATION ---
 # Using Flash for speed-sensitive tasks (commentary, opponent)
 # Using Pro for complex analysis (coach)
-commentator_model = genai.GenerativeModel('gemini-2.5-flash') 
-coach_model = genai.GenerativeModel('gemini-2.5-pro')
-opponent_model = genai.GenerativeModel('gemini-2.5-pro') 
+commentator_model = genai.GenerativeModel('gemini-2.5-flash-lite-preview-09-2025') 
+coach_model = genai.GenerativeModel('gemini-2.5-flash-lite')
+opponent_model = genai.GenerativeModel('gemini-2.5-flash') 
 
 # --- COMMENTATOR FUNCTION ---
 def get_move_commentary(move_data_dict):

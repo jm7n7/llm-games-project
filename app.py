@@ -9,6 +9,9 @@ from streamlit_image_coordinates import streamlit_image_coordinates
 from chess_app_functions import *
 import os
 import time
+from gemini_temporal_reasoning import evaluate_sequence
+
+
 #This should look correct
 
 #--- PAGE CONFIG --
@@ -404,4 +407,130 @@ elif phase == 'processing_ai_move':
     
     st.session_state.chess_game_phase = 'playing'
     st.rerun()
+
+
+
+# =============================
+# Week 10 Track B: Temporal Reasoning with Gemini + Stockfish
+# =============================
+st.header("♟️ Week 10 - Track B: Temporal Reasoning")
+
+uploaded_files = st.file_uploader(
+    "Upload consecutive chessboard frames in order (minimum 2 frames)",
+    type=["png", "jpg", "jpeg"],
+    accept_multiple_files=True
+)
+
+gt_text = st.text_input(
+    "Enter ground truth moves (comma-separated, e.g., e2-e4, g8-f6)",
+    value=""
+)
+
+if st.button("Run Temporal Reasoning"):
+    if len(uploaded_files) < 2:
+        st.error("Please upload at least 2 consecutive chessboard frames.")
+    else:
+        # Parse ground truth moves
+        ground_truth_moves = [m.strip() for m in gt_text.split(",")] if gt_text else []
+
+        with st.spinner("Analyzing moves with Gemini..."):
+            results = evaluate_sequence(uploaded_files, ground_truth_moves)
+
+        st.subheader("Results")
+
+        st.subheader("Gemini Image Move Prediction")
+        for idx, move in enumerate(results["predicted_moves"], start=1):
+            st.write(f"**Move {idx}:** {move}")
+
+        st.subheader("Image Move Prediction Metrics")
+        st.write(f"**Sequence Accuracy:** {results['sequence_accuracy']}%")
+        st.write(f"**Event MAE:** {results['event_mae']}")
+        st.write(f"**Average Latency:** {results['avg_latency_ms']} ms")
+
+        st.subheader("Stockfish Predicted Move & Evaluation")
+        st.write(f"**Stockfish Best Move:** {results['stockfish_best_move']}")
+        st.write(f"**Eval Score:** {results['stockfish_eval']}")
+        
+        st.subheader("Gemini Predicted Move and Evaluation")
+        st.write(f"**Gemini Best Move:** {results['gemini_best_move']}")
+        st.write(f"**Eval Score:** {results['gemini_eval']}")
+        st.write(f"**Best Reply to Gemini Move:** {results['stockfish_reply_to_gemini']}")
+
+
+
+
+# =============================
+# Move History → FEN + Predictions
+# =============================
+import chess
+from game_file_logger import _clean_move_notation
+from gemini_temporal_reasoning import query_stockfish, predict_next_move_with_gemini
+
+st.header("Week 10 - Track B: Additional FEN Analysis on Board State")
+
+history_text = st.text_area(
+    "Paste your move history here (e.g., '1. e4 e5 2. Nf3 Nc6 3. Bb5')",
+    height=150
+)
+
+uploaded_board = st.file_uploader(
+    "Optional: Upload a current board screenshot (to let Gemini make a visual prediction too)",
+    type=["png", "jpg", "jpeg"]
+)
+
+if st.button("Run Move History Analysis"):
+    if not history_text.strip():
+        st.error("Please paste move history first.")
+    else:
+        with st.spinner("Building FEN from move history..."):
+            # --- Step 1: Parse history into FEN ---
+            board = chess.Board()
+            moves = []
+            tokens = history_text.replace("\n", " ").split()
+            for token in tokens:
+                if token.endswith("."):
+                    continue  # skip move numbers like "1."
+                try:
+                    board.push_san(token)
+                    moves.append(token)
+                except Exception as e:
+                    print(f"Skipping token {token}: {e}")
+            final_fen = board.fen()
+
+        # --- Step 2: Stockfish eval of final state ---
+        sf = query_stockfish(final_fen)
+
+        # --- Step 3: Gemini predicts next move (from board screenshot or FEN) ---
+        gemini_next = predict_next_move_with_gemini(uploaded_board) if uploaded_board else "N/A"
+
+        # --- Step 4: Eval Gemini's predicted move (if valid) ---
+        gemini_eval, sf_reply = "N/A", "N/A"
+        if gemini_next != "N/A":
+            try:
+                board_after = chess.Board(final_fen)
+                # Normalize Gemini move: "e2-e4" → "e2e4"
+                gemini_uci = gemini_next.lower().replace("-", "").replace(" ", "").replace("to", "")
+                if len(gemini_uci) == 4:
+                    board_after.push_uci(gemini_uci)
+                    fen_after = board_after.fen()
+                    sf_after = query_stockfish(fen_after)
+                    gemini_eval = sf_after["stockfish_eval"]
+                    sf_reply = sf_after["stockfish_best_move"]
+            except Exception as e:
+                print(f"[WARN] Could not evaluate Gemini move {gemini_next}: {e}")
+
+        # --- Step 5: Output ---
+        st.subheader("Final Board State")
+        st.code(final_fen)
+
+        st.subheader("Stockfish FEN Analysis")
+        st.write(f"**Stockfish Best Move:** {sf['stockfish_best_move']}")
+        st.write(f"**Stockfish Eval:** {sf['stockfish_eval']}")
+
+        st.subheader("Gemini FEN Analysis")
+        st.write(f"**Gemini Best Move:** {gemini_next}")
+        st.write(f"**Gemini Eval:** {gemini_eval}")
+        st.write(f"**Best Reply to Gemini Move:** {sf_reply}")
+
+
 

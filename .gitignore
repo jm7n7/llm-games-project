@@ -1,2 +1,5 @@
 .env
 .DS_Store
+main.py
+TODO.md
+user_tracking_architecture.py

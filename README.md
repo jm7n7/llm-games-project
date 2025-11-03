@@ -54,6 +54,8 @@ The application uses three specialized LLM agents:
 - `chess_llm_functions.py`: LLM API integration for Coach, Opponent, and Commentator agents
 - `app.py`: Main Streamlit application and UI logic
 - `chess_app_functions.py`: Visual rendering and board interaction helpers
+- `gemini_temporal_reasoning.py`: Metrics/evaluations of moves along with next move predictions
+- `game_file_logger.py `: Cleaning and formatting game move history for metrics
 
 ### LLM Integration
 The application uses Google's Gemini models with separate API keys for each agent:
