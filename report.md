@@ -6,7 +6,6 @@
 
 **Team:** Joseph Marinello & Jack Lin
 
-**Repository:** [https://github.com/jm7n7/llm-games-project](https://github.com/jm7n7/llm-games-project)
 
 ---
 
@@ -27,15 +26,15 @@ This prototype functions as an interactive learning environment where temporal r
 
 ## Metrics and Results
 
-| Metric                 | Value        | Description                                       |
-| :--------------------- | :----------- | :------------------------------------------------ |
-| Sequence Accuracy      | 91.3 %       | Detected vs ground-truth moves matching rate      |
-| Average Latency        | 284 ms/query | Gemini move-detection latency                     |
-| Event MAE              | 0 moves      | Difference between detected and actual move count |
-| Stockfish Eval         | +0.3         | Slight advantage to White in final state          |
-| Guardrail Success Rate | 100 %        | All illegal moves caught and re-routed            |
+| Metric                 | Value            | Description                                          |
+| :--------------------- | :--------------- | :--------------------------------------------------- |
+| Sequence Accuracy      | 100.00 %         | Detected vs ground-truth moves matching rate         |
+| Average Latency        | 5206.58 ms/query | Gemini move-detection latency                        |
+| Event MAE              | 0 moves          | Difference between detected and actual move count    |
+| Stockfish Eval         | +0.5             | Slight advantage to White in final state             |
+| Guardrail Success Rate | No Metric        | All illegal moves caught and re-routed by the coach  |
 
-Metrics captured via Streamlit output (see screenshots in repo under Metrics folder).
+Metrics captured via Streamlit output (see screenshots in repo under Metrics & Evals folder).
 
 ---
 
