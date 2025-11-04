@@ -1,21 +1,20 @@
 #--- imports----------
 import streamlit as st
-from dotenv import load_dotenv # (FIX) Import dotenv
-load_dotenv() # (FIX) Load the .env file at the very start
+from dotenv import load_dotenv
+load_dotenv()
 
-import pandas as pd
-from chess_logic import ChessGame 
-import chess_llm_functions as ll_api # (This import is still used by the agents)
-import coach_agent
-import ai_opponent_agent
-import json
-from PIL import Image
-from streamlit_image_coordinates import streamlit_image_coordinates
-from chess_app_functions import *
 import os
-import time
+import json
+import coach_agent
+import pandas as pd
+import ai_opponent_agent
+import chess_llm_functions as ll_api
+
+from PIL import Image
+from chess_app_functions import *
+from chess_logic import ChessGame
 from concurrent.futures import ThreadPoolExecutor # FOR PARALLEL CALLS
-#This should look correct
+from streamlit_image_coordinates import streamlit_image_coordinates
 
 #--- PAGE CONFIG --
 st.set_page_config(
@@ -39,7 +38,7 @@ if 'GOOGLE_API_KEY' not in os.environ or not os.environ['GOOGLE_API_KEY']:
     st.error("Your Google AI API key is not configured. Please set the GOOGLE_API_KEY environment variable to play.")
     st.stop()
 
-# --- (MODIFIED) INITIALIZATION ---
+# --- INITIALIZATION ---
 # Initialize persistent state *outside* the 'New Game' block
 if 'user_skill_level' not in st.session_state:
     st.session_state.user_skill_level = "beginner"
@@ -64,12 +63,11 @@ def init_game():
     # Coach agent state
     st.session_state.pending_coach_packet = None
     st.session_state.pending_user_query = None
-    # (REMOVED) st.session_state.streaming_coach_data = None
     
-    # (NEW) Post-game summary state
+    # Post-game summary state
     st.session_state.post_game_summary_done = False
     
-    # (NEW) Pre-move context for Coach 2.0
+    # Pre-move context for Coach
     st.session_state.human_context_packet = None
 
 # Check if a game needs to be initialized
@@ -78,7 +76,7 @@ if 'chess_game' not in st.session_state:
 
 game = st.session_state.chess_game
 
-# --- (NEW) UI DRAWING FUNCTIONS (Refactored) ---
+# --- UI DRAWING FUNCTIONS ---
 
 def render_chat():
     """Renders the chat history."""
@@ -121,13 +119,12 @@ def draw_board(is_opponent_thinking=False):
 
 def draw_right_panel(chat_spinner=False, is_board_disabled=False):
     """
-    (MODIFIED) Draws the right column (info, chat, moves) and returns user input.
-    (REMOVED) stream_data argument.
+    Draws the right column (info, chat, moves) and returns user input.
     """
     
     # --- Game Info Panel ---
     st.subheader("Game Info")
-    status_container = st.container(border=True, height=200) # Increased height
+    status_container = st.container(border=True, height=200)
     phase = st.session_state.chess_game_phase
     
     with status_container:
@@ -177,8 +174,7 @@ def draw_right_panel(chat_spinner=False, is_board_disabled=False):
             else:
                  st.info(game.status_message)
 
-        # (FIX) Skill Level Selector - Moved outside 'color_selection'
-        # It is now always visible, but disabled during AI thinking
+        # Skill Level Selector - Moved outside 'color_selection'
         st.radio(
             "Select Skill Level",
             ["beginner", "intermediate", "advanced"],
@@ -190,26 +186,26 @@ def draw_right_panel(chat_spinner=False, is_board_disabled=False):
 
     # --- New Game Button ---
     if st.button("New Game", use_container_width=True, disabled=(phase == 'processing_llms' or phase == 'processing_chat_message')):
-        # (MODIFIED) Only reset game state, not chat history or skill level
+        # Only reset game state, not chat history or skill level
         init_game() 
         # Add a fresh "Hi" message from the coach
         st.session_state.chat_history.append({"role": "coach", "text": "Starting a new game! Good luck."})
         st.rerun()
 
     # --- Coach Chat Panel ---
-    st.subheader("Coach Gemini")
+    st.subheader("Coach Joey")
     chat_container = st.container(height=300, border=True)
     
     with chat_container:
         if chat_spinner:
             # Spinner is shown while waiting for the *first* chunk
-            with st.spinner("Coach is thinking..."):
+            with st.spinner("Coach Joey is thinking..."):
                 render_chat()
         else:
             # Chat is rendered normally
             render_chat()
     
-    user_prompt = st.chat_input("Ask Coach Gemini a question...", disabled=is_board_disabled)
+    user_prompt = st.chat_input("Ask Coach Joey a question...", disabled=is_board_disabled)
     
     # --- Move History Panel ---
     st.subheader("Move History")
@@ -226,22 +222,19 @@ phase = st.session_state.get('chess_game_phase')
 is_board_disabled = (phase != 'playing' and phase != 'awaiting_user_decision')
 is_opponent_thinking = (phase in ['processing_llms', 'processing_chat_message', 'processing_ai_move'])
 chat_spinner = (phase == 'processing_llms' or phase == 'processing_chat_message')
-# (REMOVED) stream_data
 
 # 2. Draw UI
 with col1:
-    # (NEW) Draw opponent panel above board
+    # Draw opponent panel above board
     draw_opponent_panel() 
     click_value = draw_board(is_opponent_thinking)
 
 with col2:
-    # (MODIFIED) Removed stream_data argument
     user_prompt = draw_right_panel(chat_spinner, is_board_disabled)
 
 
-# --- (NEW) GAME PHASE LOGIC (Agent-based) ---
+# --- GAME PHASE LOGIC (Agent-based) ---
 # This is the main state machine for the application.
-
 if phase == 'color_selection':
     # All logic is handled by the buttons in draw_right_panel()
     pass 
@@ -274,7 +267,7 @@ elif phase in ['playing', 'awaiting_user_decision']:
                     st.session_state.selected_square = None
                     st.rerun()
                 else:
-                    # (NEW) Capture "Coach 2.0" context *before* the move
+                    # Capture "Coach" context *before* the move
                     human_context_packet = {
                         "dangers_before": game.get_tactical_threats(game.turn),
                         "options_before": game.get_all_legal_moves_with_consequences(game.turn)
@@ -306,13 +299,13 @@ elif phase == 'processing_llms':
     # --- This phase runs after a *human* move is completed ---
     # This phase calls BOTH agents in parallel.
     
-    # 1. Get data for the Coach Agent (Coach 4.0)
+    # 1. Get data for the Coach Agent (Coach)
     last_move_data = game.game_data[-1]
     human_context = st.session_state.human_context_packet
     
-    # (NEW) Print the ground truth narrative for debugging
+    # Print the ground truth for debugging
     print("\n" + "="*50)
-    print("--- [GROUND TRUTH] COACH 4.0 CONTEXT ---")
+    print("--- [GROUND TRUTH] COACH CONTEXT ---")
     print(f"Dangers: {json.dumps(human_context['dangers_before'], indent=2)}")
     print(f"Options: {len(human_context['options_before'])} legal moves found")
     print(f"Chosen Move: {json.dumps(last_move_data, indent=2)}")
@@ -322,9 +315,9 @@ elif phase == 'processing_llms':
     user_skill_level = st.session_state.user_skill_level
     player_color = st.session_state.player_color
     
-    # (NEW) Generate the "Move Consequence Mapping" for the opponent
+    # Generate the "Move Consequence Mapping" for the opponent
     opponent_enhanced_moves = game.get_all_legal_moves_with_consequences(st.session_state.ai_color)
-    # (NEW) Generate the "Dangers List" for the opponent
+    # Generate the "Dangers List" for the opponent
     opponent_tactical_threats = game.get_tactical_threats(st.session_state.ai_color)
     opponent_legal_moves_simple = [m['move'] for m in opponent_enhanced_moves] # For validation
     
@@ -333,7 +326,7 @@ elif phase == 'processing_llms':
     ai_move_packet = None
 
     with ThreadPoolExecutor() as executor:
-        # (MODIFIED) Submit Coach Agent (Coach 4.0)
+        # Submit Coach Agent
         coach_future = executor.submit(
             coach_agent.get_coaching_packet,
             last_move_data,
@@ -348,8 +341,8 @@ elif phase == 'processing_llms':
         if not game.game_over:
             ai_future = executor.submit(
                 ai_opponent_agent.get_ai_move,
-                json.dumps(opponent_enhanced_moves),  # (MODIFIED) Pass as JSON
-                json.dumps(opponent_tactical_threats), # (NEW) Pass as JSON
+                json.dumps(opponent_enhanced_moves),  # Pass as JSON
+                json.dumps(opponent_tactical_threats), # Pass as JSON
                 opponent_legal_moves_simple,
                 user_skill_level
             )
@@ -381,7 +374,7 @@ elif phase == 'processing_coach_packet':
     response_type = packet.get("response_type", "silent")
     message = packet.get("message")
 
-    # (NEW) Post-Game Summary Logic
+    # Post-Game Summary Logic
     if game.game_over and not st.session_state.post_game_summary_done:
         st.session_state.post_game_summary_done = True
         
@@ -402,7 +395,7 @@ elif phase == 'processing_coach_packet':
         st.session_state.chess_game_phase = 'playing'
         st.rerun()
 
-    # (MODIFIED) Standard Packet-Handling Logic (Coach 4.0)
+    # Standard Packet-Handling Logic
     # The new coach is conversational and *always* provides feedback
     # (even if just acknowledgment) unless silent on failure.
     if response_type == "intervention":
@@ -425,12 +418,12 @@ elif phase == 'processing_coach_packet':
 
 
 elif phase == 'processing_chat_message':
-    # --- (MODIFIED) This phase runs the new Q&A Router Agent ---
+    # --- This phase runs the new Q&A Router Agent ---
     
     user_query = st.session_state.pending_user_query
     st.session_state.pending_user_query = None
     
-    # 1. (NEW) Build the full game context for the Q&A agent
+    # 1. Build the full game context for the Q&A agent
     # Get last coach message (but not if it was the user)
     last_coach_message = None
     if st.session_state.chat_history:
@@ -451,25 +444,17 @@ elif phase == 'processing_chat_message':
     }
     game_context_json = json.dumps(game_context)
     
-    # 2. (NEW) Call the Q&A Agent (non-streaming)
+    # 2. Call the Q&A Agent (non-streaming)
     # This single call runs the entire "Router -> Specialist" pipeline
     qa_packet = coach_agent.get_qa_response(user_query, game_context_json)
     
-    # 3. (NEW) Add the response and return to the game
+    # 3. Add the response and return to the game
     response_text = qa_packet.get("commentary", "My apologies, I had a connection issue.")
     st.session_state.chat_history.append({"role": "coach", "text": response_text})
     
-    # 4. (NEW) Return to the previous phase
+    # 4. Return to the previous phase
     st.session_state.chess_game_phase = st.session_state.get('return_phase', 'playing')
     st.session_state.return_phase = None
-    st.rerun()
-
-
-elif phase == 'streaming_coach_response':
-    # --- (DEPRECATED) This phase is no longer used ---
-    st.session_state.chess_game_phase = st.session_state.get('return_phase', 'playing')
-    st.session_state.return_phase = None
-    st.session_state.streaming_coach_data = None # Clear any old stream data
     st.rerun()
 
 
@@ -488,9 +473,9 @@ elif phase == 'processing_ai_move':
         # This can happen if it's AI's turn first
         print("[APP] No AI packet found, generating one now...")
         
-        # (NEW) Generate the "Move Consequence Mapping" for the opponent
+        # Generate the "Move Consequence Mapping" for the opponent
         opponent_enhanced_moves = game.get_all_legal_moves_with_consequences(st.session_state.ai_color)
-        # (NEW) Generate the "Dangers List" for the opponent
+        # Generate the "Dangers List" for the opponent
         opponent_tactical_threats = game.get_tactical_threats(st.session_state.ai_color)
         opponent_legal_moves_simple = [m['move'] for m in opponent_enhanced_moves] # For validation
         
@@ -499,8 +484,8 @@ elif phase == 'processing_ai_move':
             st.rerun()
             
         ai_packet = ai_opponent_agent.get_ai_move(
-            json.dumps(opponent_enhanced_moves),  # (MODIFIED) Pass as JSON
-            json.dumps(opponent_tactical_threats), # (NEW) Pass as JSON
+            json.dumps(opponent_enhanced_moves),  # Pass as JSON
+            json.dumps(opponent_tactical_threats), # Pass as JSON
             opponent_legal_moves_simple,
             st.session_state.user_skill_level
         )
@@ -516,12 +501,9 @@ elif phase == 'processing_ai_move':
         if game.promotion_pending:
             game.promote_pawn("Queen")
         
-        # (NEW) Store the AI's reasoning and move type for the UI
+        # Store the AI's reasoning and move type for the UI
         st.session_state.last_ai_reasoning = ai_packet.get("reasoning")
         st.session_state.last_ai_move_type = ai_packet.get("move_type")
-        
-        # 5. Get context for the Coach's *acknowledgment*
-        # (This is handled by the post-move coach now)
         
         # 6. Set state back to playing
         st.session_state.chess_game_phase = 'playing'

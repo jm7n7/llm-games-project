@@ -1,19 +1,19 @@
-import chess_llm_functions as llm_api
 import random
-import json
+import chess_llm_functions as llm_api
+
 
 def get_ai_move(enhanced_moves_json, tactical_threats_json, legal_moves_list_simple, user_skill_level):
     """
     This is the main "brain" of the AI Opponent Agent.
-    (NEW) It is now a "Router Agent" that first analyzes the situation,
+    It is now a "Router Agent" that first analyzes the situation,
     then calls a specialized tool ("best", "human", or "blunder").
     
-    (MODIFIED) Uses "Move Consequence Mapping" ("Options List") and
+    Uses "Move Consequence Mapping" ("Options List") and
     "Tactical Threats" ("Dangers List") as the new ground truth.
     """
     print(f"[OPPONENT AGENT] AI move requested. Skill level: {user_skill_level}")
     
-    # --- 1. (NEW) Call the Router Agent ---
+    # --- 1. Call the Router Agent ---
     # This call decides *which* personality to use based on high-level
     # definitions and principles.
     print(f"[OPPONENT AGENT] Calling Router Agent to select personality...")
@@ -95,4 +95,3 @@ def get_ai_move(enhanced_moves_json, tactical_threats_json, legal_moves_list_sim
         "reasoning": f"My brain short-circuited! I wanted to play {raw_move} but it wasn't a valid move. I played a random move instead.",
         "move_type": "blunder"
     }
-

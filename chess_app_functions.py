@@ -1,8 +1,8 @@
 import os
 import streamlit as st
+
 from PIL import Image, ImageDraw, ImageFont
 from streamlit_image_coordinates import streamlit_image_coordinates
-import time # Added for potential future pulsing, though not used for static color
 
 def load_piece_images():
     """Loads all piece images from the assets folder."""
@@ -62,7 +62,7 @@ def draw_chess_board_pil(piece_images, is_opponent_thinking=False):
 
             piece = board.get_piece((board_r, board_c))
             if piece and piece.image_name in piece_images:
-                # --- FIX: Changed 'filename' to 'piece.image_name' ---
+                # --- Changed 'filename' to 'piece.image_name' ---
                 piece_img = piece_images[piece.image_name].resize((SQUARE_SIZE, SQUARE_SIZE), Image.Resampling.LANCZOS)
                 img.paste(piece_img, (x0, y0), piece_img)
 
@@ -132,4 +132,3 @@ def get_click_board_coords(coords):
         c = draw_c
     
     return (r, c)
-

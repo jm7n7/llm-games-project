@@ -1,7 +1,6 @@
-import google.generativeai as genai
-import json
 import os
-import time
+import json
+import google.generativeai as genai
 
 # --- API KEY CONFIG ---
 # This is set in app.py or by the environment
@@ -14,10 +13,10 @@ genai.configure(api_key=GOOGLE_API_KEY)
 flash_model = genai.GenerativeModel('gemini-2.5-flash') 
 pro_model = genai.GenerativeModel('gemini-2.5-pro') 
 
-# --- (NEW) Move Sanitizer Tool ---
+# --- Move Sanitizer Tool ---
 def call_move_sanitizer_tool(malformed_move, legal_moves_str):
     """
-    (NEW) An LLM-based tool to repair a malformed move string.
+    An LLM-based tool to repair a malformed move string.
     It compares the bad string against the list of legal moves.
     """
     print(f"[SANITIZER TOOL] Repairing move: '{malformed_move}'")
@@ -61,7 +60,7 @@ def call_move_sanitizer_tool(malformed_move, legal_moves_str):
         print(f"!!! CRITICAL: Sanitizer Tool error: {e}")
         return {"move": None} # Fail safely
 
-# --- (NEW) Core Definitions (Shared Knowledge Base) ---
+# --- Core Definitions (Shared Knowledge Base) ---
 # This is the "Orchestration Level" logic.
 # We define it here so all opponent tools can share this context.
 CORE_CHESS_DEFINITIONS = """
@@ -114,11 +113,10 @@ CORE_CHESS_DEFINITIONS = """
  16. **"Open File" (A Positional Goal):** A file (a vertical column, e.g., 'a' through 'h') that has no pawns from *either* side on it. Open files are like highways for Rooks and Queens, allowing them to attack deep into the opponent's territory.
 """
 
-# --- (NEW) Coach 4.0 Post-Move Tools ---
-
+# --- Coach Post-Move Tools ---
 def call_triage_analyst_tool(last_move_data_json, dangers_before_json, options_before_json):
     """
-    (NEW - Coach 4.0) Specialist Tool 1: The "Triage Analyst".
+    Specialist Tool 1: The "Triage Analyst".
     This tool implements the "Offense-First" logic. Its *only* job is
     to analyze the situation and return a "verdict" JSON. It does not
     talk to the user.
@@ -129,7 +127,7 @@ def call_triage_analyst_tool(last_move_data_json, dangers_before_json, options_b
         chosen_move_data = json.loads(last_move_data_json)
         chosen_move_notation = chosen_move_data.get('move_notation', 'unknown')
         
-        # (NEW) Pre-parse the chosen move data from the OPTIONS_LIST
+        # Pre-parse the chosen move data from the OPTIONS_LIST
         # This is so the LLM doesn't have to "find" it.
         chosen_move_full_data = "null"
         try:
@@ -304,13 +302,13 @@ def call_triage_analyst_tool(last_move_data_json, dangers_before_json, options_b
         return {"verdict": "error", "focus": "tool_failure", "justification": str(e)}
 
 def call_conversational_coach_tool(triage_verdict_json, 
-                                   last_move_data_json,  # <-- NEW
-                                   dangers_before_json,  # <-- NEW
-                                   options_before_json,  # <-- NEW
+                                   last_move_data_json,
+                                   dangers_before_json,
+                                   options_before_json,
                                    user_skill_level, 
                                    player_color):
     """
-    (NEW - Coach 4.0) Specialist Tool 2: The "Conversationalist".
+    Specialist Tool 2: The "Conversationalist".
     This tool is the "mouth." It receives the "verdict" from the
     Triage Analyst and turns it into a human-like, conversational
     message, as requested by the user.
@@ -318,7 +316,7 @@ def call_conversational_coach_tool(triage_verdict_json,
     print("[CONVERSATIONALIST TOOL] Generating response...")
     try:
         prompt = f"""
-        You are 'Coach Gemini,' a friendly, human-like, and concise
+        You are 'Coach Joey,' a friendly, human-like, and concise
         chess coach. You are having an ongoing conversation with your
         student, who is `{user_skill_level}` and playing as `{player_color}`.
         
@@ -389,11 +387,11 @@ def call_conversational_coach_tool(triage_verdict_json,
         print(f"!!! CRITICAL: Conversationalist Tool error: {e}")
         return {"response_type": "silent", "message": None} # Fail silently
 
-# --- (NEW) Coach 4.0 Q&A Tools ---
+# --- Coach Q&A Tools ---
 
 def call_qa_router_tool(user_query, game_context_json):
     """
-    (NEW - Q&A 2.0) Tool 1: The "Q&A Router".
+    Tool 1: The "Q&A Router".
     This tool's only job is to analyze the user's *intent*
     and choose the correct specialist tool.
     """
@@ -447,14 +445,13 @@ def call_qa_router_tool(user_query, game_context_json):
         return {"tool_choice": "general_chit_chat"}
 
 def call_qa_explain_last_move_tool(user_query, game_context_json):
-    """(NEW - Q&A 2.0) Specialist: Explains AI's last move."""
+    """Specialist: Explains AI's last move."""
     try:
         context = json.loads(game_context_json)
         ai_reasoning = context.get("last_ai_reasoning", "I don't have a record of my last thought.")
         
         prompt = f"""
-        You are 'Coach Gemini'. The user is asking about your
-        (the AI opponent's) last move.
+        You are 'Coach Joey'. The user is asking about (the AI opponent's) last move.
         
         Your internal reasoning was: "{ai_reasoning}"
         
@@ -476,14 +473,14 @@ def call_qa_explain_last_move_tool(user_query, game_context_json):
         return {"commentary": f"Sorry, I had an error: {e}"}
 
 def call_qa_analyze_board_tool(user_query, game_context_json):
-    """(NEW - Q&A 2.0) Specialist: Analyzes the live board."""
+    """Specialist: Analyzes the live board."""
     try:
         context = json.loads(game_context_json)
         dangers = context.get("dangers_list", "[]")
         options = context.get("options_list", "[]")
         
         prompt = f"""
-        You are 'Coach Gemini'. The user is asking a strategic
+        You are 'Coach Joey'. The user is asking a strategic
         question about the *current* board state.
         
         User question: "{user_query}"
@@ -515,10 +512,10 @@ def call_qa_analyze_board_tool(user_query, game_context_json):
         return {"commentary": f"Sorry, I had an error: {e}"}
 
 def call_qa_explain_concept_tool(user_query, game_context_json):
-    """(NEW - Q&A 2.0) Specialist: Explains a core concept."""
+    """Specialist: Explains a core concept."""
     try:
         prompt = f"""
-        You are 'Coach Gemini'. The user is asking for the
+        You are 'Coach Joey'. The user is asking for the
         definition of a chess concept.
         
         User question: "{user_query}"
@@ -545,10 +542,10 @@ def call_qa_explain_concept_tool(user_query, game_context_json):
         return {"commentary": f"Sorry, I had an error: {e}"}
 
 def call_qa_chit_chat_tool(user_query, game_context_json):
-    """(NEW - Q&A 2.0) Specialist: Handles small talk."""
+    """Specialist: Handles small talk."""
     try:
         prompt = f"""
-        You are 'Coach Gemini'. The user is just making
+        You are 'Coach Joey'. The user is just making
         small talk or saying something that isn't a question.
         
         User said: "{user_query}"
@@ -569,27 +566,9 @@ def call_qa_chit_chat_tool(user_query, game_context_json):
     except Exception as e:
         return {"commentary": f"Sorry, I had an error: {e}"}
 
-# --- (DEPRECATED) Coach 2.0 Tools ---
-
-def call_analyst_tool(last_move_data_json, dangers_before_json, options_before_json):
-    """
-    (DEPRECATED - Coach 2.0) Specialist 1: The Grandmaster.
-    Analyzes the move based on the *full context* before the move was made.
-    """
-    print("[DEPRECATED] call_analyst_tool was called.")
-    return {"move_quality": "error", "message": "Deprecated function"}
-
-def call_pedagogy_tool(analysis_json, user_skill_level, player_color):
-    """
-    (DEPRECATED - Coach 2.0) Specialist 2: The Teacher.
-    Translates the Analyst's JSON into a human-readable packet.
-    """
-    print("[DEPRECATED] call_pedagogy_tool was called.")
-    return {"response_type": "silent", "message": None}
-
 def call_post_game_analyst_tool(game_data_json, player_color):
     """
-    (NEW) Specialist 3: The Post-Game Analyst.
+    Specialist 3: The Post-Game Analyst.
     Provides a summary of the entire game.
     (This function is unchanged and still used)
     """
@@ -628,36 +607,17 @@ def call_post_game_analyst_tool(game_data_json, player_color):
         print(f"!!! CRITICAL: Post-Game Tool error: {e}")
         return {"message": "Sorry, I had an error analyzing the full game."}
 
-# --- (DEPRECATED) Q&A Tool (Streaming) ---
-
-def get_coach_qa_response(user_query, board_state_narrative, player_color):
-    """
-    (DEPRECATED) Handles a direct Q&A question from the user.
-    This streaming function is replaced by the new Q&A Router Agent.
-    """
-    print("[DEPRECATED] get_coach_qa_response was called.")
-    fallback_json = {"commentary": "This function is deprecated."}
-    class _MockChunk:
-        def __init__(self, text):
-            self.text = text
-    def fallback_stream():
-        yield _MockChunk(json.dumps(fallback_json))
-    return fallback_stream()
-
-
 # --- AI Opponent Agent Tools ---
-# (All opponent functions below are unchanged)
-
 def call_opponent_router_agent(enhanced_moves_json, tactical_threats_json, user_skill_level):
     """
-    (NEW) This is the "Router Agent" or "Meta-Agent."
+    This is the "Router Agent" or "Meta-Agent."
     It uses natural language logic to choose a personality ("tool")
     based on the user's skill level and the board state.
     It uses a fast model (Flash) for low latency.
     """
     print("[ROUTER AGENT] Selecting personality...")
     try:
-        # (NEW) We create a *simplified* board state summary for the router.
+        # We create a *simplified* board state summary for the router.
         # It doesn't need all the data, just the *feel* of the game.
         threat_count = 0
         try:
@@ -734,7 +694,7 @@ def call_opponent_router_agent(enhanced_moves_json, tactical_threats_json, user_
 def call_best_move_tool(enhanced_legal_moves_json, tactical_threats_json):
     """
     Opponent Tool 1: The Engine (Specialist).
-    (MODIFIED) Now uses the CORE_CHESS_DEFINITIONS.
+    Now uses the CORE_CHESS_DEFINITIONS.
     """
     print("[BEST MOVE TOOL] Calculating best move...")
     try:
@@ -813,7 +773,7 @@ def call_best_move_tool(enhanced_legal_moves_json, tactical_threats_json):
 def call_human_like_move_tool(enhanced_legal_moves_json, tactical_threats_json):
     """
     Opponent Tool 2: The Club Player (Specialist).
-    (MODIFIED) Now uses the CORE_CHESS_DEFINITIONS.
+    Now uses the CORE_CHESS_DEFINITIONS.
     """
     print("[HUMAN MOVE TOOL] Calculating human-like move...")
     try:
@@ -876,7 +836,7 @@ def call_human_like_move_tool(enhanced_legal_moves_json, tactical_threats_json):
 def call_teaching_blunder_tool(enhanced_legal_moves_json, tactical_threats_json):
     """
     Opponent Tool 3: The Teacher-in-Disguise (Specialist).
-    (MODIFIED) Now *intentionally breaks* the CORE_CHESS_DEFINITIONS.
+    Now *intentionally breaks* the CORE_CHESS_DEFINITIONS.
     """
     print("[BLUNDER TOOL] Calculating teaching blunder...")
     try:
@@ -944,5 +904,3 @@ def call_teaching_blunder_tool(enhanced_legal_moves_json, tactical_threats_json)
     except Exception as e:
         print(f"!!! CRITICAL: Blunder Tool error: {e}")
         return {"move": None, "reasoning": "Error"}
-
-
