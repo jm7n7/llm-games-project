@@ -5,7 +5,7 @@ load_dotenv() # (FIX) Load the .env file at the very start
 
 import pandas as pd
 from chess_logic import ChessGame 
-import chess_llm_functions as ll_api
+import chess_llm_functions as ll_api # (This import is still used by the agents)
 import coach_agent
 import ai_opponent_agent
 import json
@@ -58,13 +58,13 @@ def init_game():
     
     # AI agent state
     st.session_state.pending_ai_packet = None
-    st.session_state.last_ai_reasoning = None
+    st.session_state.last_ai_reasoning = "The game has just begun. Good luck!"
     st.session_state.last_ai_move_type = "default"
     
     # Coach agent state
     st.session_state.pending_coach_packet = None
     st.session_state.pending_user_query = None
-    st.session_state.streaming_coach_data = None
+    # (REMOVED) st.session_state.streaming_coach_data = None
     
     # (NEW) Post-game summary state
     st.session_state.post_game_summary_done = False
@@ -119,8 +119,11 @@ def draw_board(is_opponent_thinking=False):
     click_value = streamlit_image_coordinates(board_image, key="chess_board")
     return click_value
 
-def draw_right_panel(chat_spinner=False, stream_data=None, is_board_disabled=False):
-    """Draws the right column (info, chat, moves) and returns user input."""
+def draw_right_panel(chat_spinner=False, is_board_disabled=False):
+    """
+    (MODIFIED) Draws the right column (info, chat, moves) and returns user input.
+    (REMOVED) stream_data argument.
+    """
     
     # --- Game Info Panel ---
     st.subheader("Game Info")
@@ -196,45 +199,15 @@ def draw_right_panel(chat_spinner=False, stream_data=None, is_board_disabled=Fal
     # --- Coach Chat Panel ---
     st.subheader("Coach Gemini")
     chat_container = st.container(height=300, border=True)
-    raw_text_accumulator = None
     
     with chat_container:
-        if chat_spinner and not stream_data:
+        if chat_spinner:
             # Spinner is shown while waiting for the *first* chunk
             with st.spinner("Coach is thinking..."):
                 render_chat()
         else:
             # Chat is rendered normally
             render_chat()
-        
-        # Stream data is handled here, rendering the last message dynamically
-        if stream_data:
-            raw_text_accumulator = ""
-            with st.chat_message(name="coach", avatar="🤖"):
-                stream_placeholder = st.empty()
-                for chunk in stream_data:
-                    try:
-                        # (MODIFIED) Handle new streaming JSON
-                        clean_chunk = chunk.text.strip().replace("```json", "").replace("```", "").strip()
-                        if clean_chunk:
-                            # Try to parse incremental JSON
-                            try:
-                                # Find the start of the JSON
-                                json_start = clean_chunk.find('{')
-                                if json_start != -1:
-                                    json_text = clean_chunk[json_start:]
-                                    # This is a brittle way to handle streaming JSON
-                                    # We assume the commentary field is last
-                                    commentary_start = json_text.find('"commentary": "')
-                                    if commentary_start != -1:
-                                        commentary_text = json_text[commentary_start + len('"commentary": "'):-2] # Strip "}}
-                                        raw_text_accumulator = commentary_text
-                                        stream_placeholder.markdown(raw_text_accumulator + "▌")
-                            except Exception as e:
-                                pass # Ignore parsing errors on partial streams
-                    except ValueError:
-                        pass # Ignore final, empty chunk
-                stream_placeholder.markdown(raw_text_accumulator) # Final render
     
     user_prompt = st.chat_input("Ask Coach Gemini a question...", disabled=is_board_disabled)
     
@@ -242,7 +215,7 @@ def draw_right_panel(chat_spinner=False, stream_data=None, is_board_disabled=Fal
     st.subheader("Move History")
     st.text_area("Moves", "\n".join(f"{i+1}. {move}" for i, move in enumerate(game.move_history)), height=150)
     
-    return user_prompt, raw_text_accumulator
+    return user_prompt
 
 
 # --- SINGLE-PASS UI DRAW ---
@@ -251,9 +224,9 @@ phase = st.session_state.get('chess_game_phase')
 
 # 1. Determine UI state flags
 is_board_disabled = (phase != 'playing' and phase != 'awaiting_user_decision')
-is_opponent_thinking = (phase in ['processing_llms', 'processing_chat_message', 'streaming_coach_response', 'processing_ai_move'])
+is_opponent_thinking = (phase in ['processing_llms', 'processing_chat_message', 'processing_ai_move'])
 chat_spinner = (phase == 'processing_llms' or phase == 'processing_chat_message')
-stream_data = st.session_state.streaming_coach_data if phase == 'streaming_coach_response' else None
+# (REMOVED) stream_data
 
 # 2. Draw UI
 with col1:
@@ -262,7 +235,8 @@ with col1:
     click_value = draw_board(is_opponent_thinking)
 
 with col2:
-    user_prompt, streamed_text = draw_right_panel(chat_spinner, stream_data, is_board_disabled)
+    # (MODIFIED) Removed stream_data argument
+    user_prompt = draw_right_panel(chat_spinner, is_board_disabled)
 
 
 # --- (NEW) GAME PHASE LOGIC (Agent-based) ---
@@ -332,13 +306,13 @@ elif phase == 'processing_llms':
     # --- This phase runs after a *human* move is completed ---
     # This phase calls BOTH agents in parallel.
     
-    # 1. Get data for the Coach Agent (Coach 2.0)
+    # 1. Get data for the Coach Agent (Coach 4.0)
     last_move_data = game.game_data[-1]
     human_context = st.session_state.human_context_packet
     
     # (NEW) Print the ground truth narrative for debugging
     print("\n" + "="*50)
-    print("--- [GROUND TRUTH] COACH 2.0 CONTEXT ---")
+    print("--- [GROUND TRUTH] COACH 4.0 CONTEXT ---")
     print(f"Dangers: {json.dumps(human_context['dangers_before'], indent=2)}")
     print(f"Options: {len(human_context['options_before'])} legal moves found")
     print(f"Chosen Move: {json.dumps(last_move_data, indent=2)}")
@@ -359,7 +333,7 @@ elif phase == 'processing_llms':
     ai_move_packet = None
 
     with ThreadPoolExecutor() as executor:
-        # Submit Coach Agent (Coach 2.0)
+        # (MODIFIED) Submit Coach Agent (Coach 4.0)
         coach_future = executor.submit(
             coach_agent.get_coaching_packet,
             last_move_data,
@@ -428,7 +402,9 @@ elif phase == 'processing_coach_packet':
         st.session_state.chess_game_phase = 'playing'
         st.rerun()
 
-    # (NEW) Standard Packet-Handling Logic
+    # (MODIFIED) Standard Packet-Handling Logic (Coach 4.0)
+    # The new coach is conversational and *always* provides feedback
+    # (even if just acknowledgment) unless silent on failure.
     if response_type == "intervention":
         # Coach wants to stop the game
         st.session_state.chat_history.append({"role": "coach", "text": message})
@@ -449,48 +425,51 @@ elif phase == 'processing_coach_packet':
 
 
 elif phase == 'processing_chat_message':
-    # --- This phase runs when the user asks a Q&A question ---
+    # --- (MODIFIED) This phase runs the new Q&A Router Agent ---
     
     user_query = st.session_state.pending_user_query
     st.session_state.pending_user_query = None
     
-    # Get context for the Q&A tool (it still uses the simple narrative)
-    board_state_narrative = game.get_board_state_narrative()
-    player_color = st.session_state.player_color
+    # 1. (NEW) Build the full game context for the Q&A agent
+    # Get last coach message (but not if it was the user)
+    last_coach_message = None
+    if st.session_state.chat_history:
+        for msg in reversed(st.session_state.chat_history):
+            if msg['role'] == 'coach':
+                last_coach_message = msg['text']
+                break
+                
+    game_context = {
+        "user_skill_level": st.session_state.user_skill_level,
+        "player_color": st.session_state.player_color,
+        "last_ai_reasoning": st.session_state.last_ai_reasoning,
+        "last_coach_message": last_coach_message,
+        "current_turn": game.turn,
+        # Provide live, ground-truth data for the 'analyze_board' specialist
+        "dangers_list": json.dumps(game.get_tactical_threats(game.turn)),
+        "options_list": json.dumps(game.get_all_legal_moves_with_consequences(game.turn))
+    }
+    game_context_json = json.dumps(game_context)
     
-    # Call the Q&A tool (streaming)
-    st.session_state.streaming_coach_data = ll_api.get_coach_qa_response(
-        user_query, 
-        board_state_narrative,
-        player_color
-    )
+    # 2. (NEW) Call the Q&A Agent (non-streaming)
+    # This single call runs the entire "Router -> Specialist" pipeline
+    qa_packet = coach_agent.get_qa_response(user_query, game_context_json)
     
-    st.session_state.chess_game_phase = 'streaming_coach_response'
+    # 3. (NEW) Add the response and return to the game
+    response_text = qa_packet.get("commentary", "My apologies, I had a connection issue.")
+    st.session_state.chat_history.append({"role": "coach", "text": response_text})
+    
+    # 4. (NEW) Return to the previous phase
+    st.session_state.chess_game_phase = st.session_state.get('return_phase', 'playing')
+    st.session_state.return_phase = None
     st.rerun()
 
 
 elif phase == 'streaming_coach_response':
-    # --- This phase handles the *output* of the Q&A stream ---
-    
-    final_commentary = ""
-    try:
-        if not streamed_text:
-            raise ValueError("Streamed text is empty")
-        
-        # The streamed_text is now the *raw* commentary,
-        # as the draw function already parsed the JSON
-        final_commentary = streamed_text
-            
-    except Exception as e: 
-        print(f"Could not parse stream, falling back. Error: {e}")
-        final_commentary = streamed_text if streamed_text else "My apologies, I had a connection issue."
-
-    # This was a Q&A response, so add it to chat and return
-    st.session_state.chat_history.append({"role": "coach", "text": final_commentary})
+    # --- (DEPRECATED) This phase is no longer used ---
     st.session_state.chess_game_phase = st.session_state.get('return_phase', 'playing')
     st.session_state.return_phase = None
-    
-    st.session_state.streaming_coach_data = None # Clear the stream data
+    st.session_state.streaming_coach_data = None # Clear any old stream data
     st.rerun()
 
 
@@ -542,7 +521,7 @@ elif phase == 'processing_ai_move':
         st.session_state.last_ai_move_type = ai_packet.get("move_type")
         
         # 5. Get context for the Coach's *acknowledgment*
-        # (We no longer need this, the AI reasoning is shown)
+        # (This is handled by the post-move coach now)
         
         # 6. Set state back to playing
         st.session_state.chess_game_phase = 'playing'
@@ -552,4 +531,3 @@ elif phase == 'processing_ai_move':
     
     st.session_state.chess_game_phase = 'playing'
     st.rerun()
-

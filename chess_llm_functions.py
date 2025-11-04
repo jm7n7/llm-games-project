@@ -61,7 +61,7 @@ def call_move_sanitizer_tool(malformed_move, legal_moves_str):
         print(f"!!! CRITICAL: Sanitizer Tool error: {e}")
         return {"move": None} # Fail safely
 
-# --- (NEW) Core Definitions (For AI Opponent) ---
+# --- (NEW) Core Definitions (Shared Knowledge Base) ---
 # This is the "Orchestration Level" logic.
 # We define it here so all opponent tools can share this context.
 CORE_CHESS_DEFINITIONS = """
@@ -111,184 +111,487 @@ CORE_CHESS_DEFINITIONS = """
 
 15. **"Doubled Pawns" (A Positional Weakness):** Two friendly pawns on the same file. They are generally considered a weakness because they cannot defend each other and are less mobile.
 
-16. **"Open File" (A Positional Goal):** A file (a vertical column, e.g., 'a' through 'h') that has no pawns from *either* side on it. Open files are like highways for Rooks and Queens, allowing them to attack deep into the opponent's territory.
+ 16. **"Open File" (A Positional Goal):** A file (a vertical column, e.g., 'a' through 'h') that has no pawns from *either* side on it. Open files are like highways for Rooks and Queens, allowing them to attack deep into the opponent's territory.
 """
 
-# --- Coach Agent Tools ---
+# --- (NEW) Coach 4.0 Post-Move Tools ---
 
-def call_analyst_tool(last_move_data_json, dangers_before_json, options_before_json):
+def call_triage_analyst_tool(last_move_data_json, dangers_before_json, options_before_json):
     """
-    (Coach 2.0) Specialist 1: The Grandmaster.
-    Analyzes the move based on the *full context* before the move was made.
+    (NEW - Coach 4.0) Specialist Tool 1: The "Triage Analyst".
+    This tool implements the "Offense-First" logic. Its *only* job is
+    to analyze the situation and return a "verdict" JSON. It does not
+    talk to the user.
     """
-    print("[ANALYST TOOL 2.0] Analyzing move...")
+    print("[TRIAGE ANALYST TOOL] Analyzing move...")
     try:
-        prompt = f"""
-        You are a grandmaster chess analysis engine. Your task is to analyze
-        the human player's `CHOSEN_MOVE` based on the *full context* of the
-        board *before* they moved.
+        # We parse the JSON here to get the specific move notation
+        chosen_move_data = json.loads(last_move_data_json)
+        chosen_move_notation = chosen_move_data.get('move_notation', 'unknown')
         
-        You must strictly follow the `CORE_CHESS_DEFINITIONS`.
-
+        # (NEW) Pre-parse the chosen move data from the OPTIONS_LIST
+        # This is so the LLM doesn't have to "find" it.
+        chosen_move_full_data = "null"
+        try:
+            options = json.loads(options_before_json)
+            for move in options:
+                if move.get('move') == chosen_move_notation:
+                    chosen_move_full_data = json.dumps(move)
+                    break
+        except Exception:
+            pass # Will remain "null"
+            
+        
+        prompt = f"""
+        You are a "Triage Analyst" engine. Your ONLY job is to analyze the
+        `CHOSEN_MOVE_DATA` based on the context and return a "verdict" JSON,
+        including a brief `justification` for your decision.
+        You must follow the "Offense-First" logic.
+        
         {CORE_CHESS_DEFINITIONS}
 
-        `DANGERS_LIST (The "Before" Picture)`:
+        `DANGERS_LIST (The "Before" Picture - What was threatening me?)`:
         {dangers_before_json}
+        
+        `CHOSEN_MOVE_DATA (The *full data* for the human's move, from OPTIONS_LIST)`:
+        {chosen_move_full_data}
+        
+        ---
+        **Your "Offense-First" Logic (Follow This Precisely):**
+        ---
 
-        `OPTIONS_LIST (All Legal Moves & Consequences)`:
-        {options_before_json}
+        **Step 1: Analyze Offensive Forcing Moves & Captures (Top Priority).**
         
-        `CHOSEN_MOVE (The Human's Move)`:
-        {last_move_data_json}
+        * **Check for Game-Winners:** Does `CHOSEN_MOVE_DATA` show
+            `checkmate: true`, a winning `is_fork: true`, or a
+            winning `creates_pin: true`?
+            * **If YES:** `verdict: "brilliant"`. Justification:
+                "The move was a game-winning forcing tactic." **STOP.**
+                
+        * **Check for Captures:** Does `CHOSEN_MOVE_DATA` show
+            `captured_piece: not null`?
+            * **If NO:** This was not a capture. **Go to Step 2.**
+            * **If YES:** This was a capture. Proceed to "Trade Analysis".
 
-        **Your Analysis Task:**
+        **Trade Analysis (CRITICAL):**
+        You must analyze the trade based *only* on the data.
         
-        1.  **Find the Chosen Move:** Look up the `CHOSEN_MOVE` (using its
-            'move_notation') inside the `OPTIONS_LIST`. This will show you
-            its pre-calculated consequences (captures, retaliation, etc.).
-            
-        2.  **Analyze Dangers:** Look at the `DANGERS_LIST`. Did the
-            `CHOSEN_MOVE` solve an "Urgent Crisis" (like a "Hanging Piece"
-            or "Pin")? Or did it *ignore* one?
-            
-        3.  **Analyze Opportunities:** Look at the `OPTIONS_LIST`. Was there
-            a "best" move (like a "Good Trade", "Fork", or "Pin") that the
-            human missed?
-            
-        4.  **Classify the Move:** Based on this analysis, classify the move:
-            - "best_move": A brilliant, top-engine move (e.g., found a
-                complex tactic, or was the only safe move).
-            - "good": A solid, strong developing move that solved or
-                ignored no dangers.
-            - "inaccuracy": A move that is okay but missed a much
-                better opportunity (e.g., missed a "Fork").
-            - "mistake": A move that worsens the position or misses a
-                simple tactic.
-            - "blunder": A critical, game-losing error (e.g., a "Hanging
-                Piece" or "Bad Trade", or ignoring an "Urgent Crisis").
-            - "book_move": A standard opening move.
+        * **A) Check for "Free Piece":** Is the `retaliation: []`
+            list **empty**? (This means the capture was defended,
+            like the `Bxf7+` example, or was completely free).
+            * **If YES:** `verdict: "brilliant"`. Justification:
+                "The move captured a piece for free, as the
+                `retaliation` list was empty (it was either undefended
+                or safely defended)." **STOP.**
 
-        **Return your analysis in this exact JSON format.**
-        Do not add any other text or markdown.
+        * **B) Check for "Bad Trade":** Is the `retaliation: []`
+            list **NOT empty**?
+            * Get `Moving_Piece_Value` (from
+                `CHOSEN_MOVE_DATA.moving_piece.value`).
+            * Get `Captured_Piece_Value` (from
+                `CHOSEN_MOVE_DATA.captured_piece.value`).
+            * Get `Lowest_Retaliator_Value` (find the minimum
+                `value` from the `retaliation` list).
+            *
+            * **If `Moving_Piece_Value > Captured_Piece_Value`**
+                (e.g., Queen(9) takes Pawn(1)): This is a **"Bad Trade"**.
+            * `verdict: "blunder"`. Justification: "The move was a
+                'Bad Trade,' capturing a low-value piece with a
+                high-value piece, leading to a loss of material."
+                **STOP.**
+
+        * **C) Check for "Good Trade":**
+            * **If `Captured_Piece_Value > Moving_Piece_Value`**
+                (e.g., Knight(3) takes Rook(5)): This is a **"Good Trade"**.
+            * `verdict: "brilliant"`. Justification: "The move
+                was a 'Good Trade,' winning material." **STOP.**
+                
+        * **D) Check for "Equal Trade" (The Pawn Recapture Bug):**
+            * **If `Moving_Piece_Value == Lowest_Retaliator_Value`**
+                (e.g., Bishop(3) takes Pawn(1), Pawn(1) *cannot*
+                recapture, but another Bishop(3) can).
+            * **If `Moving_Piece_Value == Captured_Piece_Value`**
+                (e.g., Bishop(3) takes Knight(3)).
+            * **If `Captured_Piece_Value < Moving_Piece_Value` BUT
+                `Lowest_Retaliator_Value == Moving_Piece_Value`**
+                (e.g. Bishop(3) takes Pawn(1), but is recaptured by
+                a Knight(3) or Bishop(3)).
+            * **If YES (to any of these):** This is an **"Equal Trade"**.
+            * `verdict: "acknowledgment"`. Justification: "The
+                move was an 'Equal Trade,' which is a safe and
+                valid positional choice." **STOP.**
+
+        ---
+        **Step 2: Analyze Defensive Crisis (If not a capture/forcing move).**
         
-        Example for a Blunder:
-        {{"move_quality": "blunder", "tactic_type": "Ignored Pin", "primary_threat": "The Queen on d8 was hanging to the Rook on d1, and this move ignored it.", "missed_opportunity": "The move Ng4-f6 would have blocked the pin.", "suggested_alternative": "Ng4-f6"}}
-        
-        Example for a Good Move:
-        {{"move_quality": "best_move", "tactic_type": "Fork", "primary_threat": "This move forks the King and Rook, winning material.", "missed_opportunity": "None", "suggested_alternative": "e5-f7"}}
+        * Look at the `DANGERS_LIST`. Was there an "Urgent Crisis"
+            (like a "Hanging Piece" or a "Pin" on a high-value piece)?
+        * **If YES (and user *ignored* it):** `verdict: "blunder"`.
+            Justification: "The DANGERS_LIST showed an urgent threat
+            (like a hanging Queen) that the CHOSEN_MOVE ignored." **STOP.**
+        * **If YES (and user *solved* it):** `verdict: "good"`.
+            Justification: "The DANGERS_LIST showed an urgent threat,
+            and the CHOSEN_MOVE successfully solved it." **STOP.**
+
+        ---
+        **Step 3: Analyze Principles (If safe, non-capture, non-defensive).**
+
+        * **Check for "Hanging Piece" (CRITICAL FIX - Using `defenders` list):**
+        * Does `CHOSEN_MOVE_DATA` have `captured_piece: null`
+            AND a **non-empty** `retaliation: []` list?
+            * **If NO:** The move is safe (not a capture, not attacked).
+                **Go to "Check for Tempo".**
+            * **If YES:** The move is *attacked*. Now we must
+                check if it's a blunder.
+            
+            * **(NEW DEFENDER CHECK):** Look at `CHOSEN_MOVE_DATA.defenders`.
+                Is the `defenders: []` list **non-empty**?
+                * **If YES:** The piece is defended. This is **NOT** a
+                    blunder, it is a normal, defended developing move
+                    (like Nf3 or Bc4).
+                * **Go to "Check for Tempo".**
+            
+            * **(FALLTHROUGH - IT IS ATTACKED *AND* UNDEFENDED):**
+            * The `defenders: []` list is empty. This is a true
+                "Hanging Piece" situation. Now check if it's a blunder.
+            * Get `Moving_Piece_Value` (from
+                `CHOSEN_MOVE_DATA.moving_piece.value`).
+            * Get `Lowest_Retaliator_Value` (find the minimum
+                `value` from the `retaliation` list).
+            *
+            * **If `Moving_Piece_Value > Lowest_Retaliator_Value`**
+                (e.g., Queen(9) moves to an *undefended* square
+                attacked by a Pawn(1)).
+                * This is a true **"Hanging Piece" blunder**.
+                * `verdict: "blunder"`. Justification: "This move is a
+                    'Hanging Piece' blunder. It moved to an undefended
+                    square where it can be captured by a lower-value
+                    piece for free." **STOP.**
+            *
+            * **If `Moving_Piece_Value <= Lowest_Retaliator_Value`**
+                (e.g., Knight(3) moves to an *undefended* square
+                attacked by a Queen(9)): This is **NOT** a blunder,
+                as the opponent would make a "Bad Trade" to
+                capture it.
+                * **Go to "Check for Tempo".**
+                
+        * **Check for Tempo:** The move is safe. Analyze its principle.
+        * Does it follow "Good Tempo" (`previous_move_count: 0`)?
+            * `verdict: "acknowledgment"`. Justification: "No dangers
+                and no forcing moves. The move followed 'Good Tempo'
+                by developing a new piece."
+        * Does it follow "Bad Tempo"?
+            * `verdict: "teaching"`. Justification: "No dangers/forcing
+                moves. The move was 'Bad Tempo' (e.g., moving a
+                pawn for no reason in the opening)."
+        * Is it just a simple, safe, non-noteworthy move?
+            * `verdict: "acknowledgment"`. Justification: "No dangers,
+                no forcing moves, and the move was a simple, safe
+                positional move."
+
+        Return *only* the single-line JSON verdict, including your justification.
         """
         
         response = pro_model.generate_content(prompt)
-        print(f"--- ANALYST TOOL 2.0 (RAW) ---\n{response.text}\n------------------------------")
+        print(f"--- TRIAGE ANALYST (RAW) ---\n{response.text}\n------------------------------")
         
         json_str = response.text.strip().replace("```json", "").replace("```", "").strip()
         parsed_json = json.loads(json_str)
         return parsed_json
             
     except Exception as e:
-        print(f"!!! CRITICAL: Analyst Tool 2.0 error: {e}")
-        return {"move_quality": "error", "message": str(e)}
+        print(f"!!! CRITICAL: Triage Analyst Tool error: {e}")
+        return {"verdict": "error", "focus": "tool_failure", "justification": str(e)}
 
-def call_pedagogy_tool(analysis_json, user_skill_level, player_color):
+def call_conversational_coach_tool(triage_verdict_json, 
+                                   last_move_data_json,  # <-- NEW
+                                   dangers_before_json,  # <-- NEW
+                                   options_before_json,  # <-- NEW
+                                   user_skill_level, 
+                                   player_color):
     """
-    Specialist 2: The Teacher.
-    Translates the Analyst's JSON into a human-readable packet.
+    (NEW - Coach 4.0) Specialist Tool 2: The "Conversationalist".
+    This tool is the "mouth." It receives the "verdict" from the
+    Triage Analyst and turns it into a human-like, conversational
+    message, as requested by the user.
     """
-    print("[PEDAGOGY TOOL] Generating response...")
+    print("[CONVERSATIONALIST TOOL] Generating response...")
     try:
-        # Define the persona and rules based on skill level
-        if user_skill_level == "beginner":
-            persona = f"""
-            You are 'Coach Gemini,' a super friendly, Socratic, and encouraging
-            chess teacher. Your student is a beginner.
-            
-            - Your student is playing as {player_color}. Frame all responses from
-              their perspective (e.g., "Good move!" "You are in check!").
-            - If `move_quality` is "blunder" or "mistake", you MUST
-              return `"response_type": "intervention"`. Your message should be a
-              simple, Socratic question (e.g., "Hold on! Look at your Queen.
-              Is it safe there?"). Do NOT give the answer.
-            - If `move_quality` is "best_move", return `"response_type": "praise"`.
-              Be enthusiastic! (e.g., "Great move! You saw the fork!").
-            - If `move_quality` is "good" or "book_move", return
-              `"response_type": "encouragement"`. (e.g., "Solid opening!").
-            - For "inaccuracy", return `"response_type": "silent"`.
-              Beginners don't need to be overwhelmed.
-            """
-        elif user_skill_level == "intermediate":
-            persona = f"""
-            You are 'Coach Gemini,' an insightful and clear chess coach.
-            Your student is intermediate.
-            
-            - Your student is playing as {player_color}. Frame all responses from
-              their perspective (e.g., "That move defends your pawn well.").
-            - If `move_quality` is "blunder", you MUST return
-              `"response_type": "intervention"`. Explain the *immediate* threat
-              clearly. (e.g., "[INTERVENTION] Be careful! That move hangs your
-              Rook to their Bishop.").
-            - If `move_quality` is "mistake", also return
-              `"response_type": "intervention"`, but focus on the *missed
-              opportunity* or positional problem.
-            - If `move_quality` is "best_move", return `"response_type": "praise"`.
-              Explain *why* it was a good move.
-            - For "good", "book_move", or "inaccuracy", return
-              `"response_type": "silent"`. Don't clutter the chat.
-            """
-        else: # "advanced"
-            persona = f"""
-            You are 'Coach Gemini,' a grandmaster-level analyst.
-            Your student is advanced and wants critical, high-level feedback.
-            
-            - Your student is playing as {player_color}.
-            - ONLY return `"response_type": "intervention"` for "blunder".
-              Advanced players should spot their own mistakes.
-            - If `move_quality` is "best_move", return `"response_type": "praise"`
-              and provide deep, specific analysis.
-            - If `move_quality` is "mistake" or "inaccuracy", return
-              `"response_type": "encouragement"` and briefly explain the
-              positional nuance or the better alternative.
-            - For "good" or "book_move", return `"response_type": "silent"`.
-            """
-            
         prompt = f"""
-        {persona}
+        You are 'Coach Gemini,' a friendly, human-like, and concise
+        chess coach. You are having an ongoing conversation with your
+        student, who is `{user_skill_level}` and playing as `{player_color}`.
+        
+        Your internal "Triage Analyst" just handed you this verdict.
+        Your job is to translate this verdict into a *single, supportive,
+        conversational sentence*.
+        
+        **Your Goal:** Acknowledge *every* move to keep the conversation
+        flowing. You MUST use the `FULL_MOVE_CONTEXT` and the
+        `justification` inside the `TRIAGE_VERDICT` to be specific.
+        **Do NOT use the example messages verbatim.**
+        
+        `TRIAGE_VERDICT (Your "Brain's" thought)`:
+        {triage_verdict_json}
 
-        You will be given an `ANALYSIS_JSON` from a grandmaster engine.
-        Your job is to translate this analysis into an "Instructional Packet"
-        (JSON) for the student, following all rules of your persona.
-        
-        Do NOT analyze the board yourself. Trust the `ANALYSIS_JSON`.
+        `FULL_MOVE_CONTEXT (Use this for your response!)`:
+        - CHOSEN_MOVE: {last_move_data_json}
+        - DANGERS_BEFORE: {dangers_before_json}
+        - OPTIONS_BEFORE: {options_before_json}
 
-        `ANALYSIS_JSON`:
-        {json.dumps(analysis_json)}
+        **How to Respond (Use your *own* words and the context):**
+
+        1.  **If `verdict` is "brilliant"**:
+            * This is the "checkmate" or "hanging bishop" scenario!
+            * Return `response_type: "praise"`.
+            * **Example:** "Wow, brilliant move with your Bishop to f7!
+                You found the checkmate and correctly ignored the
+                hanging bishop."
+
+        2.  **If `verdict` is "blunder"**:
+            * This is a critical, "teachable moment."
+            * Return `response_type: "intervention"`.
+            * **Example (Socratic):** "[INTERVENTION] Hold on a
+                second! I noticed you moved your pawn to a3. Did you see
+                that your Queen on d8 was in danger?"
+
+        3.  **If `verdict` is "good"**:
+            * The user solved a tough problem.
+            * Return `response_type: "praise"`.
+            * **Example:** "Nice! Good eye, you saw your Bishop on c4
+                was in trouble and moved it to safety."
+
+        4.  **If `verdict` is "teaching" (e.g., "bad_tempo")**:
+            * Return `response_type: "encouragement"`.
+            * **Example:** "Okay, that's a safe move with your a-pawn.
+                Just a small tip: in the opening, it's usually better to
+                develop your Knights and Bishops to the center first."
+                
+        5.  **If `verdict` is "acknowledgment" (e.g., "good_tempo")**:
+            * This is a standard, good move.
+            * Return `response_type: "encouragement"`.
+            * **Example:** "Nice. Moving your Knight to f3 is a solid,
+                principled move that develops a piece."
+
+        Return *only* the final JSON packet for the app.
         
-        Return your response in this exact JSON format.
-        Do not add any other text or markdown.
-        
-        {{"response_type": "praise", "message": "Great move! You're controlling the center."}}
-        
-        Example for Intervention:
-        {{"response_type": "intervention", "message": "[INTERVENTION] Hold on! Look at your Queen. Is it safe there?"}}
-        
-        Example for Silence:
-        {{"response_type": "silent", "message": null}}
+        {{"response_type": "praise", "message": "Great find!"}}
         """
         
         response = flash_model.generate_content(prompt)
-        print(f"--- PEDAGOGY TOOL (RAW) ---\n{response.text}\n------------------------------")
+        print(f"--- CONVERSATIONALIST (RAW) ---\n{response.text}\n------------------------------")
         
         json_str = response.text.strip().replace("```json", "").replace("```", "").strip()
         parsed_json = json.loads(json_str)
         return parsed_json
             
     except Exception as e:
-        print(f"!!! CRITICAL: Pedagogy Tool error: {e}")
+        print(f"!!! CRITICAL: Conversationalist Tool error: {e}")
         return {"response_type": "silent", "message": None} # Fail silently
+
+# --- (NEW) Coach 4.0 Q&A Tools ---
+
+def call_qa_router_tool(user_query, game_context_json):
+    """
+    (NEW - Q&A 2.0) Tool 1: The "Q&A Router".
+    This tool's only job is to analyze the user's *intent*
+    and choose the correct specialist tool.
+    """
+    print("[Q&A ROUTER TOOL] Analyzing user intent...")
+    try:
+        prompt = f"""
+        You are a "Q&A Router" agent. Your job is to analyze the
+        `USER_QUERY` and the `GAME_CONTEXT` to determine the
+        user's *intent*. You must then choose one specialist tool.
+        
+        `GAME_CONTEXT`:
+        {game_context_json}
+        
+        `USER_QUERY`:
+        "{user_query}"
+        
+        **Available Specialist Tools:**
+        
+        1.  **`explain_last_move`**: Use if the user is asking
+            *why* the AI (opponent) made its last move.
+            *Examples: "Why did you move your knight?", "what was
+            that move for?", "explain your reasoning"*
+            
+        2.  **`analyze_board`**: Use if the user is asking a
+            *strategic question* about the *current board state*.
+            *Examples: "Is my king safe?", "who is winning?",
+            "what should I do next?", "am I in danger?"*
+            
+        3.  **`explain_concept`**: Use if the user is asking for
+            the *definition* of a chess term.
+            *Examples: "What is a 'pin'?", "What's 'tempo'?",
+            "What is castling?"*
+            
+        4.  **`general_chit_chat`**: Use for any other social
+            interaction, greeting, or unclear question.
+            *Examples: "hi", "lol", "this is hard", "ok thanks"*
+
+        Return *only* the JSON with your choice.
+        {{"tool_choice": "explain_concept"}}
+        """
+        
+        response = flash_model.generate_content(prompt)
+        print(f"--- Q&A ROUTER (RAW) ---\n{response.text}\n------------------------------")
+        
+        json_str = response.text.strip().replace("```json", "").replace("```", "").strip()
+        parsed_json = json.loads(json_str)
+        return parsed_json
+            
+    except Exception as e:
+        print(f"!!! CRITICAL: Q&A Router Tool error: {e}")
+        return {"tool_choice": "general_chit_chat"}
+
+def call_qa_explain_last_move_tool(user_query, game_context_json):
+    """(NEW - Q&A 2.0) Specialist: Explains AI's last move."""
+    try:
+        context = json.loads(game_context_json)
+        ai_reasoning = context.get("last_ai_reasoning", "I don't have a record of my last thought.")
+        
+        prompt = f"""
+        You are 'Coach Gemini'. The user is asking about your
+        (the AI opponent's) last move.
+        
+        Your internal reasoning was: "{ai_reasoning}"
+        
+        The user asked: "{user_query}"
+        
+        Your task: Explain your reasoning in a simple,
+        first-person, conversational way.
+        
+        Example: "Good question! I moved my knight there to
+        control the center and develop a new piece."
+        
+        Return *only* the JSON response.
+        {{"commentary": "I moved my knight there because..."}}
+        """
+        response = flash_model.generate_content(prompt)
+        json_str = response.text.strip().replace("```json", "").replace("```", "").strip()
+        return json.loads(json_str)
+    except Exception as e:
+        return {"commentary": f"Sorry, I had an error: {e}"}
+
+def call_qa_analyze_board_tool(user_query, game_context_json):
+    """(NEW - Q&A 2.0) Specialist: Analyzes the live board."""
+    try:
+        context = json.loads(game_context_json)
+        dangers = context.get("dangers_list", "[]")
+        options = context.get("options_list", "[]")
+        
+        prompt = f"""
+        You are 'Coach Gemini'. The user is asking a strategic
+        question about the *current* board state.
+        
+        User question: "{user_query}"
+        
+        Use the following *ground truth data* to answer them.
+        Do not make things up.
+        
+        `GROUND_TRUTH_DANGERS (What's attacking me?)`:
+        {dangers}
+        
+        `GROUND_TRUTH_OPTIONS (What can I do?)`:
+        {options}
+        
+        Your task: Answer the user's question based *only* on the
+        ground truth.
+        
+        Example ("Is my king safe?"): "Good question. Looking at the
+        data, I don't see any immediate checks or threats to your king.
+        However, the 'dangers' list shows your Rook on a8 is
+        attacked by a Bishop."
+        
+        Return *only* the JSON response.
+        {{"commentary": "That's a great question..."}}
+        """
+        response = pro_model.generate_content(prompt) # Use Pro for smart analysis
+        json_str = response.text.strip().replace("```json", "").replace("```", "").strip()
+        return json.loads(json_str)
+    except Exception as e:
+        return {"commentary": f"Sorry, I had an error: {e}"}
+
+def call_qa_explain_concept_tool(user_query, game_context_json):
+    """(NEW - Q&A 2.0) Specialist: Explains a core concept."""
+    try:
+        prompt = f"""
+        You are 'Coach Gemini'. The user is asking for the
+        definition of a chess concept.
+        
+        User question: "{user_query}"
+        
+        Here is your entire knowledge base of definitions:
+        {CORE_CHESS_DEFINITIONS}
+        
+        Your task: Find the *most relevant* definition from your
+        knowledge base that answers the user's question. Explain it
+        simply, like a human teacher.
+        
+        Example ("What is a pin?"): "A 'pin' is a cool tactic!
+        It's when you attack an enemy piece, but it can't move
+        because a *more valuable* piece (like a Queen or King)
+        is hiding right behind it."
+        
+        Return *only* the JSON response.
+        {{"commentary": "A 'pin' is when..."}}
+        """
+        response = flash_model.generate_content(prompt)
+        json_str = response.text.strip().replace("```json", "").replace("```", "").strip()
+        return json.loads(json_str)
+    except Exception as e:
+        return {"commentary": f"Sorry, I had an error: {e}"}
+
+def call_qa_chit_chat_tool(user_query, game_context_json):
+    """(NEW - Q&A 2.0) Specialist: Handles small talk."""
+    try:
+        prompt = f"""
+        You are 'Coach Gemini'. The user is just making
+        small talk or saying something that isn't a question.
+        
+        User said: "{user_query}"
+        
+        Your task: Just be friendly and encouraging!
+        
+        Examples:
+        - "lol" -> "Haha!"
+        - "this is hard" -> "You're doing great! Keep it up."
+        - "hi" -> "Hi there!"
+        
+        Return *only* the JSON response.
+        {{"commentary": "You've got this!"}}
+        """
+        response = flash_model.generate_content(prompt)
+        json_str = response.text.strip().replace("```json", "").replace("```", "").strip()
+        return json.loads(json_str)
+    except Exception as e:
+        return {"commentary": f"Sorry, I had an error: {e}"}
+
+# --- (DEPRECATED) Coach 2.0 Tools ---
+
+def call_analyst_tool(last_move_data_json, dangers_before_json, options_before_json):
+    """
+    (DEPRECATED - Coach 2.0) Specialist 1: The Grandmaster.
+    Analyzes the move based on the *full context* before the move was made.
+    """
+    print("[DEPRECATED] call_analyst_tool was called.")
+    return {"move_quality": "error", "message": "Deprecated function"}
+
+def call_pedagogy_tool(analysis_json, user_skill_level, player_color):
+    """
+    (DEPRECATED - Coach 2.0) Specialist 2: The Teacher.
+    Translates the Analyst's JSON into a human-readable packet.
+    """
+    print("[DEPRECATED] call_pedagogy_tool was called.")
+    return {"response_type": "silent", "message": None}
 
 def call_post_game_analyst_tool(game_data_json, player_color):
     """
     (NEW) Specialist 3: The Post-Game Analyst.
     Provides a summary of the entire game.
+    (This function is unchanged and still used)
     """
     print("[POST-GAME TOOL] Analyzing full game...")
     try:
@@ -325,55 +628,25 @@ def call_post_game_analyst_tool(game_data_json, player_color):
         print(f"!!! CRITICAL: Post-Game Tool error: {e}")
         return {"message": "Sorry, I had an error analyzing the full game."}
 
-# --- Q&A Tool (Streaming) ---
+# --- (DEPRECATED) Q&A Tool (Streaming) ---
 
 def get_coach_qa_response(user_query, board_state_narrative, player_color):
     """
-    Handles a direct Q&A question from the user.
-    This is the only streaming function.
-    (This tool still uses the simple narrative, which is fine for Q&A)
+    (DEPRECATED) Handles a direct Q&A question from the user.
+    This streaming function is replaced by the new Q&A Router Agent.
     """
-    print("[Q&A TOOL] Answering user question...")
-    try:
-        prompt = f"""
-        You are 'Coach Gemini,' a friendly, grandmaster-level chess coach.
-        A student, who is playing as {player_color}, has a direct question.
-        
-        - Use the `BOARD_STATE_NARRATIVE` as your *only* source of truth
-          for all piece positions and tactics.
-        - Answer their question directly and helpfully.
-        
-        `BOARD_STATE_NARRATIVE (ABSOLUTE TRUTH)`:
-        {board_state_narrative}
-
-        `USER_QUESTION`:
-        "{user_query}"
-
-        Return your answer in this exact JSON format.
-        Do not add any other text or markdown.
-
-        {{"commentary": "That's a great question! The e4 pawn is..."}}
-        """
-        
-        # This function *returns the stream* for app.py to handle
-        response_stream = pro_model.generate_content(prompt, stream=True)
-        return response_stream
-            
-    except Exception as e:
-        print(f"!!! CRITICAL: Q&A Tool error: {e}")
-        fallback_json = {"commentary": f"Sorry, an error occurred: {e}"}
-        
-        # Mock a stream for fallback
-        class _MockChunk:
-            def __init__(self, text):
-                self.text = text
-        def fallback_stream():
-            yield _MockChunk(json.dumps(fallback_json))
-        
-        return fallback_stream()
+    print("[DEPRECATED] get_coach_qa_response was called.")
+    fallback_json = {"commentary": "This function is deprecated."}
+    class _MockChunk:
+        def __init__(self, text):
+            self.text = text
+    def fallback_stream():
+        yield _MockChunk(json.dumps(fallback_json))
+    return fallback_stream()
 
 
 # --- AI Opponent Agent Tools ---
+# (All opponent functions below are unchanged)
 
 def call_opponent_router_agent(enhanced_moves_json, tactical_threats_json, user_skill_level):
     """
@@ -671,4 +944,5 @@ def call_teaching_blunder_tool(enhanced_legal_moves_json, tactical_threats_json)
     except Exception as e:
         print(f"!!! CRITICAL: Blunder Tool error: {e}")
         return {"move": None, "reasoning": "Error"}
+
 

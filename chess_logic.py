@@ -668,6 +668,7 @@ class ChessGame:
                 "captured_piece": None,
                 "consequences": [],
                 "retaliation": [], # (NEW) For the 2-ply check
+                "defenders": [], # (NEW) For the defense check
                 "creates_pin": None, # (NEW) For offensive pin check
                 "is_fork": False # (NEW) For offensive fork check
             }
@@ -730,6 +731,20 @@ class ChessGame:
                                     "value": attacker_piece.value,
                                     "position": self.pos_to_notation((r,c))
                                 })
+
+            # 4b. (NEW) Defender Check
+            # Is the square the piece *landed on* defended by its *own* team?
+            for r in range(8):
+                for c in range(8):
+                    defender_piece = self.board.get_piece((r, c))
+                    # Check if it's a friendly piece AND *not* the piece that just moved
+                    if defender_piece and defender_piece.color == color and defender_piece.position != end_pos:
+                        if end_pos in defender_piece.get_attack_squares(self.board):
+                            packet["defenders"].append({
+                                "name": defender_piece.name,
+                                "value": defender_piece.value,
+                                "position": self.pos_to_notation((r,c))
+                            })
 
             # (NEW) 5. Check if this move *creates* a pin (Offensive Pin)
             if hasattr(piece, 'directions'): # Only sliding pieces can pin
