@@ -1,6 +1,6 @@
 import uuid
 import copy
-import json # (NEW) For dumping game data
+import json
 
 class Piece:
     """Base class for all chess pieces."""
@@ -8,11 +8,11 @@ class Piece:
         self.color = color
         self.position = position
         self.has_moved = False
-        self.move_count = 0 # (NEW) For tempo tracking
+        self.move_count = 0 # For tempo tracking
         self.symbol = 'X' # Fallback symbol
         self.name = name if name else self.__class__.__name__
         self.image_name = f"{self.color[0]}_{self.__class__.__name__.lower()}.png"
-        self.value = 0 # (NEW) Base value
+        self.value = 0 # Base value
 
     def get_valid_moves(self, board, game=None):
         """Returns a list of valid moves for the piece."""
@@ -20,7 +20,7 @@ class Piece:
 
     def get_attack_squares(self, board):
         """
-        (FIXED) Returns squares this piece is attacking,
+        Returns squares this piece is attacking,
         including through/at friendly pieces (for defense/x-ray).
         """
         raise NotImplementedError
@@ -42,7 +42,7 @@ class King(Piece):
     def __init__(self, color, position, name=None):
         super().__init__(color, position, name or "King")
         self.symbol = '♔' if color == 'white' else '♚'
-        self.value = 1000 # (NEW) Invaluable
+        self.value = 1000 # Invaluable
 
     def _get_castling_moves(self, board, game):
         castling_moves = []
@@ -77,7 +77,7 @@ class King(Piece):
         return moves
     
     def get_attack_squares(self, board):
-        """(FIXED) Calculates all squares this King attacks (for check/defense)."""
+        """Calculates all squares this King attacks (for check/defense)."""
         moves = []
         r, c = self.position
         for dr in [-1, 0, 1]:
@@ -94,13 +94,13 @@ class Queen(Piece):
     def __init__(self, color, position, name=None):
         super().__init__(color, position, name or "Queen")
         self.symbol = '♕' if color == 'white' else '♛'
-        self.value = 9 # (NEW)
+        self.value = 9
         self.directions = [(-1, -1), (-1, 1), (1, -1), (1, 1), (-1, 0), (1, 0), (0, -1), (0, 1)] # (NEW)
 
     def get_valid_moves(self, board, game=None):
         moves = []
         r, c = self.position
-        for dr, dc in self.directions: # (MODIFIED)
+        for dr, dc in self.directions:
             for i in range(1, 8):
                 new_pos = (r + i * dr, c + i * dc)
                 is_valid, can_capture = self._is_valid_and_capturable(new_pos, board)
@@ -111,10 +111,10 @@ class Queen(Piece):
         return moves
 
     def get_attack_squares(self, board):
-        """(FIXED) Calculates attack squares, including X-Ray defense."""
+        """Calculates attack squares, including X-Ray defense."""
         moves = []
         r, c = self.position
-        for dr, dc in self.directions: # (MODIFIED)
+        for dr, dc in self.directions:
             for i in range(1, 8):
                 new_pos = (r + i * dr, c + i * dc)
                 nr, nc = new_pos
@@ -129,13 +129,13 @@ class Rook(Piece):
     def __init__(self, color, position, name=None):
         super().__init__(color, position, name)
         self.symbol = '♖' if color == 'white' else '♜'
-        self.value = 5 # (NEW)
-        self.directions = [(-1, 0), (1, 0), (0, -1), (0, 1)] # (NEW)
+        self.value = 5
+        self.directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
 
     def get_valid_moves(self, board, game=None):
         moves = []
         r, c = self.position
-        for dr, dc in self.directions: # (MODIFIED)
+        for dr, dc in self.directions:
             for i in range(1, 8):
                 new_pos = (r + i * dr, c + i * dc)
                 is_valid, can_capture = self._is_valid_and_capturable(new_pos, board)
@@ -146,10 +146,10 @@ class Rook(Piece):
         return moves
 
     def get_attack_squares(self, board):
-        """(FIXED) Calculates attack squares, including X-Ray defense."""
+        """Calculates attack squares, including X-Ray defense."""
         moves = []
         r, c = self.position
-        for dr, dc in self.directions: # (MODIFIED)
+        for dr, dc in self.directions:
             for i in range(1, 8):
                 new_pos = (r + i * dr, c + i * dc)
                 nr, nc = new_pos
@@ -164,13 +164,13 @@ class Bishop(Piece):
     def __init__(self, color, position, name=None):
         super().__init__(color, position, name)
         self.symbol = '♗' if color == 'white' else '♝'
-        self.value = 3 # (NEW)
-        self.directions = [(-1, -1), (-1, 1), (1, -1), (1, 1)] # (NEW)
+        self.value = 3
+        self.directions = [(-1, -1), (-1, 1), (1, -1), (1, 1)]
 
     def get_valid_moves(self, board, game=None):
         moves = []
         r, c = self.position
-        for dr, dc in self.directions: # (MODIFIED)
+        for dr, dc in self.directions:
             for i in range(1, 8):
                 new_pos = (r + i * dr, c + i * dc)
                 is_valid, can_capture = self._is_valid_and_capturable(new_pos, board)
@@ -181,10 +181,10 @@ class Bishop(Piece):
         return moves
 
     def get_attack_squares(self, board):
-        """(FIXED) Calculates attack squares, including X-Ray defense."""
+        """Calculates attack squares, including X-Ray defense."""
         moves = []
         r, c = self.position
-        for dr, dc in self.directions: # (MODIFIED)
+        for dr, dc in self.directions:
             for i in range(1, 8):
                 new_pos = (r + i * dr, c + i * dc)
                 nr, nc = new_pos
@@ -199,7 +199,7 @@ class Knight(Piece):
     def __init__(self, color, position, name=None):
         super().__init__(color, position, name)
         self.symbol = '♘' if color == 'white' else '♞'
-        self.value = 3 # (NEW)
+        self.value = 3
 
     def get_valid_moves(self, board, game=None):
         moves = []
@@ -211,7 +211,7 @@ class Knight(Piece):
         return moves
 
     def get_attack_squares(self, board):
-        """(FIXED) Calculates all squares this Knight attacks (for check/defense)."""
+        """Calculates all squares this Knight attacks (for check/defense)."""
         moves = []
         r, c = self.position
         potential_moves = [(r-2, c-1), (r-2, c+1), (r+2, c-1), (r+2, c+1), (r-1, c-2), (r-1, c+2), (r+1, c-2), (r+1, c+2)]
@@ -226,7 +226,7 @@ class Pawn(Piece):
     def __init__(self, color, position, name=None):
         super().__init__(color, position, name)
         self.symbol = '♙' if color == 'white' else '♟'
-        self.value = 1 # (NEW)
+        self.value = 1
 
     def get_valid_moves(self, board, game=None):
         moves = []
@@ -254,7 +254,7 @@ class Pawn(Piece):
         return moves
 
     def get_attack_squares(self, board):
-        """(FIXED) Calculates all squares this Pawn attacks (for check/defense)."""
+        """Calculates all squares this Pawn attacks (for check/defense)."""
         moves = []
         r, c = self.position
         direction = -1 if self.color == 'white' else 1
@@ -287,7 +287,7 @@ class Board:
             self.set_piece(end_pos, piece)
             self.set_piece(start_pos, None)
             piece.has_moved = True
-            piece.move_count += 1 # (NEW) Increment move count
+            piece.move_count += 1 # Increment move count
             return captured_piece
         return None
     
@@ -358,7 +358,7 @@ class ChessGame:
         # Add turn
         state_parts.append(f" {self.turn[0]} ")
         
-        # --- FIXED Castling Rights Logic ---
+        # --- Castling Rights Logic ---
         castling_rights = ""
         
         # White King
@@ -386,7 +386,7 @@ class ChessGame:
                 castling_rights += "q"
                 
         state_parts.append(f"{castling_rights if castling_rights else '-'} ")
-        # --- END Fixed Logic ---
+        # --- Fixed Logic ---
 
         # Add en passant
         state_parts.append(f"{self.pos_to_notation(self.en_passant_target) if self.en_passant_target else '-'}")
@@ -396,7 +396,7 @@ class ChessGame:
     def get_board_state_narrative(self):
         """
         Generates a 100% accurate, human-readable narrative of the
-        current board state for the COACH LLM.
+        current board state for the (old) COACH LLM Q&A tool.
         """
         narrative = []
         pieces = {'white': [], 'black': []}
@@ -468,6 +468,7 @@ class ChessGame:
             'checkmate': 1 if is_checkmate else 0,
             'promoted': 1 if promoted_into else 0, 'promoted_into': promoted_into if promoted_into else 'NA',
             'draw': 0, # This will be updated by _update_game_status if true
+            'move_notation': f"{self.pos_to_notation(start_pos)}-{self.pos_to_notation(end_pos)}" # (NEW) For Coach 2.0
         }
         self.game_data.append(move_data)
 
@@ -518,7 +519,7 @@ class ChessGame:
         return False
 
     def _get_attackers_of_square(self, pos, attacker_color):
-        """(NEW) Helper function to get a list of all pieces attacking a square."""
+        """Helper function to get a list of all pieces attacking a square."""
         attackers = []
         for r in range(8):
             for c in range(8):
@@ -530,7 +531,7 @@ class ChessGame:
 
     def _get_all_legal_moves_tuples(self, color):
         """
-        (NEW) Internal helper to get all legal moves as (start, end, piece) tuples.
+        Internal helper to get all legal moves as (start, end, piece) tuples.
         This is the new source of truth for all move generation.
         """
         for r in range(8):
@@ -545,7 +546,7 @@ class ChessGame:
     def _get_all_legal_moves(self, color):
         """
         Gets all legal moves (in 'e2-e4' format) for a given color.
-        (MODIFIED) Uses the new tuple generator.
+        Uses the new tuple generator.
         """
         all_moves = []
         for start_pos, end_pos, _ in self._get_all_legal_moves_tuples(color):
@@ -554,7 +555,7 @@ class ChessGame:
         
     def get_tactical_threats(self, color_being_threatened):
         """
-        (NEW) This is the "Dangers List" / "Smart Triage List" generator.
+        This is the "Dangers List" / "Smart Triage List" generator.
         It scans the *current* board for threats against the given color,
         including simple threats and pins.
         """
@@ -642,7 +643,7 @@ class ChessGame:
 
     def get_all_legal_moves_with_consequences(self, color):
         """
-        (MODIFIED) This is the new "Move Consequence Mapping" function.
+        This is the new "Move Consequence Mapping" function.
         It simulates every legal move to see what its results are
         (captures, checks, attacks) AND checks for retaliation.
         This is the "predictive" ground truth for the AI Opponent Agent.
@@ -655,30 +656,31 @@ class ChessGame:
             
             move_notation = f"{self.pos_to_notation(start_pos)}-{self.pos_to_notation(end_pos)}"
             
-            # --- (NEW) Define the packet structure ---
+            # --- Define the packet structure ---
             captured_piece_on_square = self.board.get_piece(end_pos)
             packet = {
                 "move": move_notation,
                 "moving_piece": {
                     "name": piece.name,
                     "value": piece.value,
-                    "previous_move_count": piece.move_count # (NEW) Add tempo data
+                    "previous_move_count": piece.move_count # Add tempo data
                 },
                 "captured_piece": None,
                 "consequences": [],
-                "retaliation": [], # (NEW) For the 2-ply check
-                "creates_pin": None, # (NEW) For offensive pin check
-                "is_fork": False # (NEW) For offensive fork check
+                "retaliation": [], # For the 2-ply check
+                "defenders": [], # For the defense check
+                "creates_pin": None, # For offensive pin check
+                "is_fork": False # For offensive fork check
             }
 
             # --- Simulate Move ---
             original_piece_has_moved = piece.has_moved # Store pre-move state
-            original_move_count = piece.move_count # (NEW) Store pre-move state
+            original_move_count = piece.move_count # Store pre-move state
             
             self.board.set_piece(end_pos, piece)
             self.board.set_piece(start_pos, None)
             piece.has_moved = True # Temporarily set
-            piece.move_count += 1 # (NEW) Temporarily set
+            piece.move_count += 1 # Temporarily set
             
             # --- Analyze Consequences of the *simulated* board state ---
             
@@ -693,11 +695,11 @@ class ChessGame:
                 target = self.board.get_piece(attack_pos)
                 if target and target.color == opponent_color:
                     packet["consequences"].append(f"Attacks {target.name} on {self.pos_to_notation(attack_pos)}")
-                    # (NEW) Track high-value attacks for fork detection
+                    # Track high-value attacks for fork detection
                     if target.value >= 3: # Knight, Bishop, Rook, Queen
                         attacked_high_value_pieces.append(target)
             
-            # (NEW) 2a. Check for Forks
+            # 2a. Check for Forks
             if len(attacked_high_value_pieces) >= 2:
                 packet["is_fork"] = True
                 
@@ -705,17 +707,17 @@ class ChessGame:
             is_check = self.is_in_check(opponent_color)
             if is_check:
                 packet["consequences"].append("Delivers check!")
-                # (NEW) Check if the check is *also* a high-value attack (a fork)
+                # Check if the check is *also* a high-value attack (a fork)
                 king_pos = self.board.find_king(opponent_color)
                 # Avoid double-counting if king is already in the list
                 if king_pos and king_pos not in [p.position for p in attacked_high_value_pieces]:
                     attacked_high_value_pieces.append(self.board.get_piece(king_pos))
             
-            # (NEW) Re-check for forks including the King
+            # Re-check for forks including the King
             if len(attacked_high_value_pieces) >= 2:
                 packet["is_fork"] = True
                 
-            # 4. (NEW) Retaliation Check
+            # 4. Retaliation Check
             # Is the square the piece *landed on* attacked by the opponent?
             if self.is_square_attacked(end_pos, opponent_color):
                 # Find all pieces that are attacking that square
@@ -730,7 +732,21 @@ class ChessGame:
                                     "position": self.pos_to_notation((r,c))
                                 })
 
-            # (NEW) 5. Check if this move *creates* a pin (Offensive Pin)
+            # 4b. Defender Check
+            # Is the square the piece *landed on* defended by its *own* team?
+            for r in range(8):
+                for c in range(8):
+                    defender_piece = self.board.get_piece((r, c))
+                    # Check if it's a friendly piece AND *not* the piece that just moved
+                    if defender_piece and defender_piece.color == color and defender_piece.position != end_pos:
+                        if end_pos in defender_piece.get_attack_squares(self.board):
+                            packet["defenders"].append({
+                                "name": defender_piece.name,
+                                "value": defender_piece.value,
+                                "position": self.pos_to_notation((r,c))
+                            })
+
+            # 5. Check if this move *creates* a pin (Offensive Pin)
             if hasattr(piece, 'directions'): # Only sliding pieces can pin
                 for dr, dc in piece.directions:
                     # Scan along this direction from the piece's new position
@@ -773,7 +789,7 @@ class ChessGame:
             self.board.set_piece(start_pos, piece)
             self.board.set_piece(end_pos, captured_piece_on_square)
             piece.has_moved = original_piece_has_moved # Restore
-            piece.move_count = original_move_count # (NEW) Restore
+            piece.move_count = original_move_count # Restore
             
             # --- Store Result ---
             if not packet["consequences"]:
@@ -919,7 +935,7 @@ class ChessGame:
         original_piece = self.board.get_piece(start_pos)
         captured_piece = self.board.get_piece(end_pos)
         original_has_moved = original_piece.has_moved
-        original_move_count = original_piece.move_count # (NEW) Store move count
+        original_move_count = original_piece.move_count # Store move count
         
         # Simulate move
         self.board.set_piece(end_pos, original_piece)
@@ -930,8 +946,8 @@ class ChessGame:
         # Undo move
         self.board.set_piece(start_pos, original_piece)
         self.board.set_piece(end_pos, captured_piece)
-        original_piece.has_moved = original_has_moved # (FIX) Restore has_moved state
-        original_piece.move_count = original_move_count # (NEW) Restore move count
+        original_piece.has_moved = original_has_moved # Restore has_moved state
+        original_piece.move_count = original_move_count # Restore move count
         
         return in_check
 
