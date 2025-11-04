@@ -6,7 +6,6 @@ load_dotenv()
 import os
 import json
 import coach_agent
-import pandas as pd
 import ai_opponent_agent
 import chess_llm_functions as ll_api
 
