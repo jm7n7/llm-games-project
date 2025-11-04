@@ -1,8 +1,11 @@
 # RooChess: Humanistic Learning with LLMs
 
 **Course:** CS 5588 – Video LLMs for Real-Time Temporal and Spatial Reasoning
+
 **Track B:** Temporal Reasoning
+
 **Team:** Joseph Marinello & Jack Lin
+
 **Repository:** [https://github.com/jm7n7/llm-games-project](https://github.com/jm7n7/llm-games-project)
 
 ---
