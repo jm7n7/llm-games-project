@@ -17,12 +17,12 @@ from streamlit_image_coordinates import streamlit_image_coordinates
 
 #--- PAGE CONFIG --
 st.set_page_config(
-    page_title="Chess Coach",
+    page_title="RooChess",
     layout="wide"
 )
 
 #--- APP TITLE AND HEADER------
-st.title("LLM Chess Coach")
+st.title("")
 
 #--- SIDEBAR (simplified) -------------
 st.sidebar.header("About")
@@ -30,7 +30,7 @@ st.sidebar.info("This chess app uses a team of specialized LLM agents to create 
 
 
 #--- MAIN CONTENT AREA -----------------------------------------------
-st.header("Chess")
+st.header("")
 
 # --- API KEY CHECK ---
 if 'GOOGLE_API_KEY' not in os.environ or not os.environ['GOOGLE_API_KEY']:
@@ -42,7 +42,7 @@ if 'GOOGLE_API_KEY' not in os.environ or not os.environ['GOOGLE_API_KEY']:
 if 'user_skill_level' not in st.session_state:
     st.session_state.user_skill_level = "beginner"
 if 'chat_history' not in st.session_state:
-    st.session_state.chat_history = [{"role": "coach", "text": "Hi! I'm Coach Gemini. I'll be watching your game and offering feedback."}]
+    st.session_state.chat_history = [{"role": "coach", "text": "Hi! I'm Coach Joey. I'll be watching your game and offering feedback."}]
 
 # Initialize game-specific state
 def init_game():
