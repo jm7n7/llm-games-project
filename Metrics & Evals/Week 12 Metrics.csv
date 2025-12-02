@@ -1,0 +1,12 @@
+﻿Metrics,Values
+predicted_moves," ['b1-c3', 'g8-f6', 'e2-e4']"
+ground_truth," ['b1-c3', 'g8-f6', 'e2-e4']"
+sequence_accuracy,100
+event_mae,0
+avg_latency_ms,7265.99
+final_fen, rnbqkb1r/pppppppp/5n2/8/4P3/2N5/PPPP1PPP/R1BQKBNR b KQkq - 0 2
+stockfish_eval,0.05
+stockfish_best_move, bestmove e7e5 ponder g1f3
+gemini_best_move, d7-d5
+gemini_eval,0.99
+stockfish_reply_to_gemini, bestmove e4d5 ponder f6d5
