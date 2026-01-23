@@ -26,3 +26,6 @@ steps:
 
 images:
   - 'gcr.io/$PROJECT_ID/gen-lang-client-0992759099'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
