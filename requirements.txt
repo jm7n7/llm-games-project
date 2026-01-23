@@ -1,6 +1,5 @@
-# Core dependencies for LLM Chess App
-pillow==11.3.0
-streamlit==1.49.0
-python-dotenv==1.1.1
-google-generativeai==0.8.5
-streamlit-image-coordinates==0.2.2
+flask
+flask-session
+google-genai
+gunicorn
+# Add any other existing dependencies if needed, e.g. python-dotenv if used locally
