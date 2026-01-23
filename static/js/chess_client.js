@@ -389,6 +389,7 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error("Error promoting:", error);
         }
     }
+
     // --- Chat Logic ---
     const chatInput = document.getElementById('user-input');
     const sendBtn = document.getElementById('send-btn');
@@ -418,8 +419,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             const data = await response.json();
 
-            // Remove typing indicator logic simply by replacing text or removing element
-            // specific implementation: remove last child if it matches typingId
             const typingEl = document.getElementById(typingId);
             if (typingEl) typingEl.remove();
 
@@ -437,7 +436,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const msgDiv = document.createElement('div');
         msgDiv.classList.add('chat-message', `message-${sender}`);
         msgDiv.innerText = text;
-        // Unique ID for typing removal
         const id = `msg-${Date.now()}`;
         msgDiv.id = id;
 
@@ -448,21 +446,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- AI Logic ---
     async function checkAITurn() {
-        // We assume we know if it's AI turn effectively if isPlayerTurn is false 
-        // AND the game isn't over.
-        // However, isPlayerTurn is just a frontend lock.
-        // Let's rely on the backend response. If updateStatus says "Black's Turn | AI",
-        // we should trigger the AI.
-
         // Wait a beat for animations
         setTimeout(async () => {
-            const statusText = turnIndicator.innerText; // "Black's Turn"
-            const playerText = statusElement.innerText; // "| AI"
-
-            // Simpler check: logic in updateStatus implies we know who is moving.
-            // Let's add a global flag or check 'playerColor' vs 'turn'.
-            // Actually, we can just hit the endpoint. If it returns "Not AI's turn", fine.
-
             try {
                 const response = await fetch('/api/ai_move', {
                     method: 'POST',
@@ -472,19 +457,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (data.status === 'success') {
                     // AI Moved!
-                    fetchGameState(); // Refresh board
+                    fetchGameState();
 
-                    // Show reasoning in chat? Optional feature.
+                    // Show reasoning in chat
                     if (data.reasoning) {
                         addMessage(`I played ${data.move}. ${data.reasoning}`, 'coach');
                     }
                 }
             } catch (e) {
-                console.log("AI check skipped or failed", e);
+                console.log("AI check skipped", e);
             }
-        }, 1000); // 1s delay for realism
+        }, 1000);
     }
-
-// Hook into game flow:
-// When game state updates, if it's AI turn, trigger it.
-// We modify updateStatus to call checkAITurn.
+// End of file

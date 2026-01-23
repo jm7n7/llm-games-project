@@ -1,0 +1,28 @@
+steps:
+  # Build the container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/gen-lang-client-0992759099', '.']
+  
+  # Push the container image to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/gen-lang-client-0992759099']
+  
+  # Deploy container image to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'gen-lang-client-0992759099'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/gen-lang-client-0992759099'
+      - '--region'
+      - 'us-central1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      # Vertex AI access requires no special flags if using default SA, 
+      # but ensure the Cloud Run SA has "Vertex AI User" role.
+
+images:
+  - 'gcr.io/$PROJECT_ID/gen-lang-client-0992759099'
