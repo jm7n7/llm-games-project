@@ -22,7 +22,8 @@ class OpponentAgent:
             fen=fen,
             legal_moves=str(legal_moves),
             move_history=str(move_history),
-            color=color
+            color=color,
+            model="gemini-2.5-pro"
         )
         
         if not response:

@@ -98,34 +98,143 @@ def make_move():
     if not game:
         return jsonify({"status": "error", "message": "No active game"}), 404
         
+from concurrent.futures import ThreadPoolExecutor
+import json
+
+@app.route('/api/process_move', methods=['POST'])
+def process_move():
+    """
+    Orchestrates the turn:
+    1. Makes Human Move.
+    2. Runs Agent Analysis & AI Move Search in Parallel.
+    3. Returns Intervention status.
+    """
+    game = session.get('chess_game')
+    if not game:
+        return jsonify({"status": "error", "message": "No active game"}), 404
+        
     data = request.json
-    start_pos = data.get('start') # Expected format: [row, col]
-    end_pos = data.get('end')     # Expected format: [row, col]
+    start_pos = data.get('start') 
+    end_pos = data.get('end')
     
     if not start_pos or not end_pos:
         return jsonify({"status": "error", "message": "Invalid coordinates"}), 400
         
-    # Convert list to tuple
     start_tuple = tuple(start_pos)
     end_tuple = tuple(end_pos)
     
-    # Store pre-move state for coach (TODO)
-    
-    # Attempt move
+    # 1. Apply Human Move
     success, message = game.make_move(start_tuple, end_tuple)
     
-    if success:
-        # Save state back to session (important for filesystem sessions sometimes)
-        session['chess_game'] = game
-        return jsonify({
-            "status": "success",
-            "message": message,
-            "game_over": game.game_over
-        })
-        return jsonify({
-            "status": "invalid",
-            "message": message
-        })
+    if not success:
+        return jsonify({"status": "invalid", "message": message}), 400
+        
+    # Get last move info for analyis
+    last_move_san = game.move_history[-1] if game.move_history else "Unknown"
+    fen_after_move = game.board.fen()
+    
+    # 2. Parallel Execution (Coach Analysis + Opponent Think)
+    coach_result = {"type": "normal", "message": ""}
+    ai_move_result = None
+    ai_reasoning = ""
+    
+    if not game.game_over:
+        with ThreadPoolExecutor() as executor:
+            # We assume AI plays the opposite color of the human (who just moved)
+            # So game.turn is now the AI's turn.
+            
+            # Task A: Coach checks for blunders in the HUMAN'S move (just made)
+            # Note: We assess the move just made.
+            future_coach = executor.submit(
+                coach_agent.analyze_move, 
+                fen_after_move, 
+                str(game.move_history), 
+                last_move_san
+            )
+            
+            # Task B: Opponent calculate reponse
+            future_ai = executor.submit(
+                opponent_agent.get_move, 
+                fen_after_move
+            )
+            
+            # Wait for results
+            try:
+                coach_result = future_coach.result(timeout=10) # 10s timeout
+            except Exception as e:
+                print(f"Coach failed: {e}")
+                
+            try:
+                ai_move_result, ai_reasoning = future_ai.result(timeout=10)
+            except Exception as e:
+                print(f"AI failed: {e}")
+
+    # 3. Store AI move in session for confirmation
+    session['pending_ai_move'] = ai_move_result
+    session['pending_ai_reasoning'] = ai_reasoning
+    session['chess_game'] = game # Save state
+    
+    return jsonify({
+        "status": "success",
+        "fen": game.board.fen(),
+        "game_over": game.game_over,
+        "coach_feedback": coach_result,  # {type, message}
+        "ai_move": ai_move_result if coach_result.get('type') != 'intervention' else None,
+        "ai_reasoning": ai_reasoning
+    })
+
+@app.route('/api/confirm_ai_move', methods=['POST'])
+def confirm_ai_move():
+    """Executes the pending AI move (used after intervention check)."""
+    game = session.get('chess_game')
+    ai_move_uci = session.get('pending_ai_move')
+    
+    if not game or not ai_move_uci:
+        return jsonify({"status": "error", "message": "No pending AI move"}), 400
+        
+    # Helper to convert UCI to coords (duplicated logic, should serve refactor)
+    def uci_to_coords(uci):
+        files = 'abcdefgh'
+        c1 = files.index(uci[0])
+        r1 = 8 - int(uci[1])
+        c2 = files.index(uci[2])
+        r2 = 8 - int(uci[3])
+        return (r1, c1), (r2, c2)
+        
+    start, end = uci_to_coords(ai_move_uci)
+    success, msg = game.make_move(start, end)
+    
+    # Auto-promote
+    if len(ai_move_uci) == 5:
+        game.promote_pawn("Queen") # Simplified default
+        
+    session['pending_ai_move'] = None # Clear
+    session['chess_game'] = game
+    
+    return jsonify({
+        "status": "success", 
+        "move": ai_move_uci,
+        "fen": game.board.fen()
+    })
+
+@app.route('/api/undo_move', methods=['POST'])
+def undo_move():
+    """Reverts the last move."""
+    game = session.get('chess_game')
+    if game:
+        # Assuming ChessGame has undo logic. From previous files, I recall distinct state methods.
+        # Streamlit app used `game.revert_to_pre_move_state()` but that was for specific flow.
+        # python-chess board.pop() works if history kept.
+        # Let's try basic pop if available, or just reload game.
+        try:
+            game.board.pop() # Undo last move
+            game.move_history.pop()
+            game.turn = 'white' if game.turn == 'black' else 'black' # Toggle back
+            session['chess_game'] = game
+            return jsonify({"status": "success", "fen": game.board.fen()})
+        except:
+            return jsonify({"status": "error", "message": "Cannot undo"}), 400
+    return jsonify({"status": "error"}), 404
 
 @app.route('/api/legal_moves', methods=['POST'])
 def get_legal_moves():

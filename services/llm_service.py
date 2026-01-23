@@ -16,50 +16,38 @@ class LLMService:
             # It automatically uses ADC from the environment (Cloud Run or local 'gcloud auth').
             # Location can be customized, 'us-central1' is a safe default for Vertex.
             self.client = genai.Client(vertexai=True, location='us-central1')
-            self.model_name = "gemini-2.0-flash-exp" # Or "gemini-1.5-pro" based on availability
+            self.model_name = "gemini-2.5-flash" # Or "gemini-1.5-pro" based on availability
             logger.info(f"LLMService initialized with model: {self.model_name}")
         except Exception as e:
             logger.error(f"Failed to initialize LLMService: {e}")
             self.client = None
 
-    def get_chat_response(self, system_instruction: str, user_message: str, history: list = None) -> str:
+    
+    def get_chat_response(self, system_instruction: str, user_message: str, history: list = None, model: str = None, tools: list = None) -> str:
         """
         Generates a chat response from the LLM.
-        
-        Args:
-            system_instruction: The persona/rules for the agent.
-            user_message: The latest input from the user.
-            history: Optional list of previous turn objects (managed by frontend or session).
-                     Expected format compatible with the SDK's history if using stateful chat,
-                     or we can just append to prompt.
-                     
-        Returns:
-            The text response from the model.
         """
         if not self.client:
             return "Error: LLM Service not available."
 
+        target_model = model if model else self.model_name
+
         try:
-            # Construct a simple content list for stateless call or maintain chat session
-            # For simplicity in this architecture, we'll treat it as a single turn with history context if provided
-            # But the SDK supports a chat session.
-            
-            # config = types.GenerateContentConfig(
-            #     system_instruction=system_instruction,
-            #     temperature=0.7,
-            # )
-            
-            # For now, let's just do a direct generate_content with the system prompt included or config
-            # usage: client.models.generate_content(model='...', contents='...', config=...)
-            
+            config_args = {
+                "system_instruction": system_instruction,
+                "temperature": 0.7,
+            }
+            if tools:
+                config_args["tools"] = tools
+
             response = self.client.models.generate_content(
-                model=self.model_name,
+                model=target_model,
                 contents=user_message,
-                config=types.GenerateContentConfig(
-                    system_instruction=system_instruction,
-                    temperature=0.7
-                )
+                config=types.GenerateContentConfig(**config_args)
             )
+            
+            # TODO: Handle function calls if tools are used (not fully implemented in this wrapper yet)
+            # For now, we assume text response or simple tool usage.
             
             if response.text:
                 return response.text
@@ -69,12 +57,14 @@ class LLMService:
             logger.error(f"Error generating chat response: {e}")
             return "I encountered an error while thinking."
 
-    def get_move_recommendation(self, fen: str, legal_moves: list, move_history: list, color: str) -> str:
+    def get_move_recommendation(self, fen: str, legal_moves: list, move_history: list, color: str, model: str = None) -> str:
         """
         Asks the LLM for a chess move.
         """
         if not self.client:
             return None
+
+        target_model = model if model else self.model_name
 
         prompt = f"""
         You are a Chess Grandmaster engine. 
@@ -90,7 +80,7 @@ class LLMService:
         
         try:
             response = self.client.models.generate_content(
-                model=self.model_name,
+                model=target_model,
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     temperature=0.3 # Lower temp for logic
