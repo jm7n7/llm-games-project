@@ -469,4 +469,4 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }, 1000);
     }
-// End of file
+}); // End DOMContentLoaded
