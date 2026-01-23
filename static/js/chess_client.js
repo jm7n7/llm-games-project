@@ -239,277 +239,279 @@ document.addEventListener('DOMContentLoaded', () => {
             showGameOver(data);
         }
 
-        function showGameOver(data) {
-            gameOverModal.classList.remove('hidden');
+    }
 
-            if (data.winner === 'draw') {
-                gameOverTitle.innerText = "Game Drawn";
-                gameOverMessage.innerText = data.status_message;
-            } else if (data.winner) {
-                const winnerName = data.winner.charAt(0).toUpperCase() + data.winner.slice(1);
-                gameOverTitle.innerText = `${winnerName} Wins!`;
-                gameOverMessage.innerText = `Checkmate! ${data.status_message}`;
-            }
+    function showGameOver(data) {
+        gameOverModal.classList.remove('hidden');
+
+        if (data.winner === 'draw') {
+            gameOverTitle.innerText = "Game Drawn";
+            gameOverMessage.innerText = data.status_message;
+        } else if (data.winner) {
+            const winnerName = data.winner.charAt(0).toUpperCase() + data.winner.slice(1);
+            gameOverTitle.innerText = `${winnerName} Wins!`;
+            gameOverMessage.innerText = `Checkmate! ${data.status_message}`;
         }
+    }
 
-        async function handleSquareClick(physR, physC) {
-            if (!isPlayerTurn) return;
+    async function handleSquareClick(physR, physC) {
+        if (!isPlayerTurn) return;
 
-            // Convert physical to logical
-            const [r, c] = getLogicalCoords(physR, physC);
+        // Convert physical to logical
+        const [r, c] = getLogicalCoords(physR, physC);
 
-            const square = getSquareByLogicalCoords(r, c); // Get the element for visual checking
-            const hasPiece = square.querySelector('.piece');
+        const square = getSquareByLogicalCoords(r, c); // Get the element for visual checking
+        const hasPiece = square.querySelector('.piece');
 
-            // 1. If nothing selected, select piece
-            if (!selectedSquare) {
-                if (hasPiece) {
-                    await selectSquare(r, c);
-                }
-                return;
-            }
-
-            // 2. If something selected...
-            const startPos = [selectedSquare.r, selectedSquare.c];
-            const endPos = [r, c];
-
-            // If clicked same square, deselect
-            if (startPos[0] === endPos[0] && startPos[1] === endPos[1]) {
-                deselectSquare();
-                return;
-            }
-
-            // If clicked another friendly piece, switch selection
+        // 1. If nothing selected, select piece
+        if (!selectedSquare) {
             if (hasPiece) {
-                const isValidMove = validMoves.some(m => m[0] === r && m[1] === c);
-                if (!isValidMove) {
-                    await selectSquare(r, c);
-                    return;
-                }
+                await selectSquare(r, c);
             }
+            return;
+        }
 
-            // Try to move
-            if (validMoves.some(m => m[0] === r && m[1] === c)) {
-                await makeMove(startPos, endPos);
-                deselectSquare();
-            } else {
-                deselectSquare();
+        // 2. If something selected...
+        const startPos = [selectedSquare.r, selectedSquare.c];
+        const endPos = [r, c];
+
+        // If clicked same square, deselect
+        if (startPos[0] === endPos[0] && startPos[1] === endPos[1]) {
+            deselectSquare();
+            return;
+        }
+
+        // If clicked another friendly piece, switch selection
+        if (hasPiece) {
+            const isValidMove = validMoves.some(m => m[0] === r && m[1] === c);
+            if (!isValidMove) {
+                await selectSquare(r, c);
+                return;
             }
         }
 
-        async function selectSquare(r, c) {
-            if (selectedSquare) deselectSquare();
-            selectedSquare = { r, c };
-
-            const sq = getSquareByLogicalCoords(r, c);
-            if (sq) sq.classList.add('selected');
-
-            try {
-                const response = await fetch('/api/legal_moves', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ start: [r, c] })
-                });
-                const data = await response.json();
-                if (data.status === 'success') {
-                    validMoves = data.moves;
-                    showValidMoves();
-                }
-            } catch (e) {
-                console.error("Error fetching moves", e);
-            }
+        // Try to move
+        if (validMoves.some(m => m[0] === r && m[1] === c)) {
+            await makeMove(startPos, endPos);
+            deselectSquare();
+        } else {
+            deselectSquare();
         }
+    }
 
-        function showValidMoves() {
-            validMoves.forEach(move => {
-                const [r, c] = move;
-                const sq = getSquareByLogicalCoords(r, c);
-                if (sq) sq.classList.add('valid-move');
+    async function selectSquare(r, c) {
+        if (selectedSquare) deselectSquare();
+        selectedSquare = { r, c };
+
+        const sq = getSquareByLogicalCoords(r, c);
+        if (sq) sq.classList.add('selected');
+
+        try {
+            const response = await fetch('/api/legal_moves', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ start: [r, c] })
             });
-        }
-
-        function deselectSquare() {
-            if (selectedSquare) {
-                const sq = getSquareByLogicalCoords(selectedSquare.r, selectedSquare.c);
-                if (sq) sq.classList.remove('selected');
-                selectedSquare = null;
-            }
-            validMoves.forEach(move => {
-                const [r, c] = move;
-                const sq = getSquareByLogicalCoords(r, c);
-                if (sq) sq.classList.remove('valid-move');
-            });
-            validMoves = [];
-        }
-
-        async function makeMove(start, end) {
-            try {
-                // Optimistic update handled by caller? No, usually not for this complex flow.
-                // Let's assume we wait for server to allow intervention check.
-
-                const response = await fetch('/api/process_move', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ start, end })
-                });
-                const data = await response.json();
-
-                if (data.status === 'success') {
-                    // Move Valid
-                    fetchGameState(); // Update board state immediately (Human move)
-
-                    const feedback = data.coach_feedback;
-                    if (feedback && feedback.message) {
-                        addMessage(feedback.message, 'coach');
-                    }
-
-                    if (feedback.type === 'intervention') {
-                        // --- INTERVENTION ---
-                        // Show modal, don't play AI move yet
-                        showInterventionModal(feedback.message);
-                    } else if (data.ai_move) {
-                        // --- NO INTERVENTION ---
-                        // Play AI move immediately
-                        setTimeout(() => {
-                            // We handled AI move logic in backend confirmation? 
-                            // Actually, process_move returns ai_move BUT doesn't apply it to board?
-                            // Wait, my backend logic:
-                            // "3. Store AI move in session... return ai_move if no intervention"
-                            // But we didn't apply it to the board object in Python? 
-                            // Ah, the Python code calls game.make_move for HUMAN, but only calculates AI.
-                            // So we need to execute the AI move now.
-
-                            executeAIMove();
-                        }, 800);
-                    }
-                } else {
-                    console.warn("Invalid move:", data.message);
-                    // Revert UI if needed
-                }
-            } catch (error) {
-                console.error("Error making move:", error);
-            }
-        }
-
-        async function executeAIMove() {
-            // Calls the endpoint to APPLY the pending AI move
-            const response = await fetch('/api/confirm_ai_move', { method: 'POST' });
             const data = await response.json();
             if (data.status === 'success') {
+                validMoves = data.moves;
+                showValidMoves();
+            }
+        } catch (e) {
+            console.error("Error fetching moves", e);
+        }
+    }
+
+    function showValidMoves() {
+        validMoves.forEach(move => {
+            const [r, c] = move;
+            const sq = getSquareByLogicalCoords(r, c);
+            if (sq) sq.classList.add('valid-move');
+        });
+    }
+
+    function deselectSquare() {
+        if (selectedSquare) {
+            const sq = getSquareByLogicalCoords(selectedSquare.r, selectedSquare.c);
+            if (sq) sq.classList.remove('selected');
+            selectedSquare = null;
+        }
+        validMoves.forEach(move => {
+            const [r, c] = move;
+            const sq = getSquareByLogicalCoords(r, c);
+            if (sq) sq.classList.remove('valid-move');
+        });
+        validMoves = [];
+    }
+
+    async function makeMove(start, end) {
+        try {
+            // Optimistic update handled by caller? No, usually not for this complex flow.
+            // Let's assume we wait for server to allow intervention check.
+
+            const response = await fetch('/api/process_move', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ start, end })
+            });
+            const data = await response.json();
+
+            if (data.status === 'success') {
+                // Move Valid
+                fetchGameState(); // Update board state immediately (Human move)
+
+                const feedback = data.coach_feedback;
+                if (feedback && feedback.message) {
+                    addMessage(feedback.message, 'coach');
+                }
+
+                if (feedback.type === 'intervention') {
+                    // --- INTERVENTION ---
+                    // Show modal, don't play AI move yet
+                    showInterventionModal(feedback.message);
+                } else if (data.ai_move) {
+                    // --- NO INTERVENTION ---
+                    // Play AI move immediately
+                    setTimeout(() => {
+                        // We handled AI move logic in backend confirmation? 
+                        // Actually, process_move returns ai_move BUT doesn't apply it to board?
+                        // Wait, my backend logic:
+                        // "3. Store AI move in session... return ai_move if no intervention"
+                        // But we didn't apply it to the board object in Python? 
+                        // Ah, the Python code calls game.make_move for HUMAN, but only calculates AI.
+                        // So we need to execute the AI move now.
+
+                        executeAIMove();
+                    }, 800);
+                }
+            } else {
+                console.warn("Invalid move:", data.message);
+                // Revert UI if needed
+            }
+        } catch (error) {
+            console.error("Error making move:", error);
+        }
+    }
+
+    async function executeAIMove() {
+        // Calls the endpoint to APPLY the pending AI move
+        const response = await fetch('/api/confirm_ai_move', { method: 'POST' });
+        const data = await response.json();
+        if (data.status === 'success') {
+            fetchGameState();
+        }
+    }
+
+    function showInterventionModal(message) {
+        // Reuse Game Over or Promotion modal style for simplicity?
+        // Or inject a new one. Let's reuse Promotion modal structure via JS if possible, 
+        // logic is safer to just create a dynamic overlay or use `confirm`.
+        // `confirm` is blocking/ugly. Let's assume we have an 'intervention-modal'.
+
+        // Quick Hack: Modify Game Over modal content temporarily
+        gameOverTitle.innerText = "Wait! Coach Intervention 🛑";
+        gameOverMessage.innerText = message;
+        modalNewGameBtn.innerText = "Ignore & Continue";
+
+        // Add a secondary button for "Undo"
+        let undoBtn = document.getElementById('modal-undo-btn');
+        if (!undoBtn) {
+            undoBtn = document.createElement('button');
+            undoBtn.id = 'modal-undo-btn';
+            undoBtn.className = 'btn-primary'; // Style it
+            undoBtn.style.backgroundColor = '#666'; // Grey logic
+            undoBtn.style.marginLeft = '10px';
+            undoBtn.innerText = "Take Back Move";
+            modalNewGameBtn.parentNode.appendChild(undoBtn);
+
+            undoBtn.addEventListener('click', async () => {
+                await fetch('/api/undo_move', { method: 'POST' });
+                gameOverModal.classList.add('hidden');
+                fetchGameState(); // Revert board
+            });
+        }
+
+        // Override "Ignore" behavior
+        modalNewGameBtn.onclick = async () => {
+            gameOverModal.classList.add('hidden');
+            // Restore default behavior
+            modalNewGameBtn.onclick = () => { gameOverModal.classList.add('hidden'); startNewGame(); };
+            executeAIMove();
+        };
+
+        gameOverModal.classList.remove('hidden');
+    }
+
+    async function handlePromotionSelection(pieceName) {
+        try {
+            const response = await fetch('/api/promote', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ promotion: pieceName })
+            });
+            const data = await response.json();
+
+            if (data.status === 'success') {
+                promotionModal.classList.add('hidden');
                 fetchGameState();
             }
+        } catch (error) {
+            console.error("Error promoting:", error);
         }
+    }
 
-        function showInterventionModal(message) {
-            // Reuse Game Over or Promotion modal style for simplicity?
-            // Or inject a new one. Let's reuse Promotion modal structure via JS if possible, 
-            // logic is safer to just create a dynamic overlay or use `confirm`.
-            // `confirm` is blocking/ugly. Let's assume we have an 'intervention-modal'.
+    // --- Chat Logic ---
+    const chatInput = document.getElementById('user-input');
+    const sendBtn = document.getElementById('send-btn');
+    const chatHistory = document.getElementById('chat-history');
 
-            // Quick Hack: Modify Game Over modal content temporarily
-            gameOverTitle.innerText = "Wait! Coach Intervention 🛑";
-            gameOverMessage.innerText = message;
-            modalNewGameBtn.innerText = "Ignore & Continue";
+    sendBtn.addEventListener('click', sendMessage);
+    chatInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') sendMessage();
+    });
 
-            // Add a secondary button for "Undo"
-            let undoBtn = document.getElementById('modal-undo-btn');
-            if (!undoBtn) {
-                undoBtn = document.createElement('button');
-                undoBtn.id = 'modal-undo-btn';
-                undoBtn.className = 'btn-primary'; // Style it
-                undoBtn.style.backgroundColor = '#666'; // Grey logic
-                undoBtn.style.marginLeft = '10px';
-                undoBtn.innerText = "Take Back Move";
-                modalNewGameBtn.parentNode.appendChild(undoBtn);
+    async function sendMessage() {
+        const text = chatInput.value.trim();
+        if (!text) return;
 
-                undoBtn.addEventListener('click', async () => {
-                    await fetch('/api/undo_move', { method: 'POST' });
-                    gameOverModal.classList.add('hidden');
-                    fetchGameState(); // Revert board
-                });
+        // Add user message
+        addMessage(text, 'user');
+        chatInput.value = '';
+
+        // Show typing indicator
+        const typingId = addMessage("Thinking...", 'coach');
+
+        try {
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: text })
+            });
+            const data = await response.json();
+
+            const typingEl = document.getElementById(typingId);
+            if (typingEl) typingEl.remove();
+
+            if (data.status === 'success') {
+                addMessage(data.response, 'coach');
+            } else {
+                addMessage("I'm having trouble connecting to the matrix.", 'coach');
             }
-
-            // Override "Ignore" behavior
-            modalNewGameBtn.onclick = async () => {
-                gameOverModal.classList.add('hidden');
-                // Restore default behavior
-                modalNewGameBtn.onclick = () => { gameOverModal.classList.add('hidden'); startNewGame(); };
-                executeAIMove();
-            };
-
-            gameOverModal.classList.remove('hidden');
+        } catch (error) {
+            console.error("Chat error:", error);
         }
+    }
 
-        async function handlePromotionSelection(pieceName) {
-            try {
-                const response = await fetch('/api/promote', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ promotion: pieceName })
-                });
-                const data = await response.json();
+    function addMessage(text, sender) {
+        const msgDiv = document.createElement('div');
+        msgDiv.classList.add('chat-message', `message-${sender}`);
+        msgDiv.innerText = text;
+        const id = `msg-${Date.now()}`;
+        msgDiv.id = id;
 
-                if (data.status === 'success') {
-                    promotionModal.classList.add('hidden');
-                    fetchGameState();
-                }
-            } catch (error) {
-                console.error("Error promoting:", error);
-            }
-        }
+        chatHistory.appendChild(msgDiv);
+        chatHistory.scrollTop = chatHistory.scrollHeight;
+        return id;
+    }
 
-        // --- Chat Logic ---
-        const chatInput = document.getElementById('user-input');
-        const sendBtn = document.getElementById('send-btn');
-        const chatHistory = document.getElementById('chat-history');
-
-        sendBtn.addEventListener('click', sendMessage);
-        chatInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') sendMessage();
-        });
-
-        async function sendMessage() {
-            const text = chatInput.value.trim();
-            if (!text) return;
-
-            // Add user message
-            addMessage(text, 'user');
-            chatInput.value = '';
-
-            // Show typing indicator
-            const typingId = addMessage("Thinking...", 'coach');
-
-            try {
-                const response = await fetch('/api/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: text })
-                });
-                const data = await response.json();
-
-                const typingEl = document.getElementById(typingId);
-                if (typingEl) typingEl.remove();
-
-                if (data.status === 'success') {
-                    addMessage(data.response, 'coach');
-                } else {
-                    addMessage("I'm having trouble connecting to the matrix.", 'coach');
-                }
-            } catch (error) {
-                console.error("Chat error:", error);
-            }
-        }
-
-        function addMessage(text, sender) {
-            const msgDiv = document.createElement('div');
-            msgDiv.classList.add('chat-message', `message-${sender}`);
-            msgDiv.innerText = text;
-            const id = `msg-${Date.now()}`;
-            msgDiv.id = id;
-
-            chatHistory.appendChild(msgDiv);
-            chatHistory.scrollTop = chatHistory.scrollHeight;
-            return id;
-        }
-
-    }); // End DOMContentLoaded
+}); // End DOMContentLoaded
