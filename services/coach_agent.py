@@ -4,7 +4,7 @@ import chess_llm_functions as llm_api
 
 # --- 1. POST-MOVE COACH AGENT ("Offense-First" Pipeline) ---
 
-def get_coaching_packet(last_move_data, dangers_before_json, options_before_json, user_skill_level, player_color):
+def get_coaching_packet(last_move_data, dangers_before_json, options_before_json, user_skill_level, player_color, player_name):
     """
     This is the main "brain" of the post-move Coach Agent.
     It orchestrates the "Triage -> Converse" pipeline to implement the
@@ -35,8 +35,10 @@ def get_coaching_packet(last_move_data, dangers_before_json, options_before_json
         json.dumps(last_move_data),  # <-- Pass the move data
         dangers_before_json,        # <-- Pass the dangers context
         options_before_json,        # <-- Pass the options context
+        options_before_json,        # <-- Pass the options context
         user_skill_level, 
-        player_color
+        player_color,
+        player_name
     )
     
     if not instruction_packet:

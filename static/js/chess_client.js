@@ -98,7 +98,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Read color selection
         const colorInput = document.querySelector('input[name="playerColor"]:checked');
         playerColor = colorInput ? colorInput.value : 'white';
-        
+
         // Read skill level
         const skillInput = document.querySelector('input[name="skillLevel"]:checked');
         const skillLevel = skillInput ? skillInput.value : 'beginner';
@@ -107,7 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch('/api/new_game', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
+                body: JSON.stringify({
                     player_color: playerColor,
                     skill_level: skillLevel
                 })
@@ -210,7 +210,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const isMyTurn = data.turn === playerColor;
-        const moverName = isMyTurn ? "Player" : "AI";
+        const moverName = isMyTurn ? (data.username || "Player") : "AI";
         const turnColorFormatted = data.turn.charAt(0).toUpperCase() + data.turn.slice(1);
 
         // Status Text

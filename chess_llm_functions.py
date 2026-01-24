@@ -308,7 +308,8 @@ def call_conversational_coach_tool(triage_verdict_json,
                                    dangers_before_json,
                                    options_before_json,
                                    user_skill_level, 
-                                   player_color):
+                                   player_color,
+                                   player_name):
     """
     Specialist Tool 2: The "Conversationalist".
     This tool is the "mouth." It receives the "verdict" from the
@@ -320,7 +321,7 @@ def call_conversational_coach_tool(triage_verdict_json,
         prompt = f"""
         You are 'Coach Joey,' a friendly, human-like, and concise
         chess coach. You are having an ongoing conversation with your
-        student, who is `{user_skill_level}` and playing as `{player_color}`.
+        student, {player_name}, who is `{user_skill_level}` and playing as `{player_color}`.
         
         Your internal "Triage Analyst" just handed you this verdict.
         Your job is to translate this verdict into a *single, supportive,

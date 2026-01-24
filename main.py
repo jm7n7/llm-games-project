@@ -139,7 +139,8 @@ def get_state():
         "game_over": game.game_over,
         "in_check": game.is_in_check(game.turn),
         "winner": 'draw' if "draw" in game.status_message.lower() else ('white' if game.turn == 'black' else 'black') if game.game_over else None,
-        "status_message": game.status_message
+        "status_message": game.status_message,
+        "username": session.get('user_id', 'Player')
     })
 
 @app.route('/api/process_move', methods=['POST'])
@@ -196,8 +197,10 @@ def process_move():
             last_move_data,
             json.dumps(dangers_before),
             json.dumps(options_before),
+            options_before,
             user_skill,
-            player_color
+            player_color,
+            session.get('first_name', 'Student')
         )
         
         # Task B: Opponent Agent (AI)
@@ -378,6 +381,7 @@ def api_login():
     if user:
         session['user_id'] = username
         session['email'] = user.get('email')
+        session['first_name'] = user.get('first_name', 'Student')
         
         if request.is_json:
             return jsonify({"status": "success"})
@@ -457,6 +461,7 @@ def chat():
     context = {
         "user_skill_level": user_skill,
         "player_color": player_color,
+        "player_name": session.get('first_name', 'Student'),
         "last_ai_reasoning": session.get('pending_ai_reasoning', ""), # Might be stale
         "current_turn": game.turn,
         # Live analysis for Q&A
