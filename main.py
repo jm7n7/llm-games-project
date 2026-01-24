@@ -197,7 +197,6 @@ def process_move():
             last_move_data,
             json.dumps(dangers_before),
             json.dumps(options_before),
-            options_before,
             user_skill,
             player_color,
             session.get('first_name', 'Student')
