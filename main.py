@@ -131,7 +131,7 @@ def process_move():
         
     # Get last move info for analyis
     last_move_san = game.move_history[-1] if game.move_history else "Unknown"
-    fen_after_move = game.board.fen()
+    fen_after_move = game.fen
     
     # 2. Parallel Execution (Coach Analysis + Opponent Think)
     coach_result = {"type": "normal", "message": ""}
@@ -176,7 +176,7 @@ def process_move():
     
     return jsonify({
         "status": "success",
-        "fen": game.board.fen(),
+        "fen": game.fen,
         "game_over": game.game_over,
         "coach_feedback": coach_result,  # {type, message}
         "ai_move": ai_move_result if coach_result.get('type') != 'intervention' else None,

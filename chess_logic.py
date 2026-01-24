@@ -336,6 +336,13 @@ class ChessGame:
         r, c = pos
         return f"{'abcdefgh'[c]}{8-r}"
 
+    @property
+    def fen(self):
+        """Returns the FEN string for the current position."""
+        base = self._get_board_state_string()
+        # Append dummy halfmove and fullmove counters (0 1) for python-chess compatibility
+        return f"{base} 0 1"
+
     def _get_board_state_string(self):
         """Generates a FEN-like string for position history tracking."""
         state_parts = []
