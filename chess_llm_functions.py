@@ -12,8 +12,8 @@ vertexai.init(project=PROJECT_ID, location=LOCATION)
 # --- MODEL INITIALIZATION ---
 # Using Flash for speed-sensitive tasks
 # Using Pro for complex analysis
-flash_model = GenerativeModel('gemini-1.5-flash') 
-pro_model = GenerativeModel('gemini-1.5-pro') 
+flash_model = GenerativeModel('gemini-2.5-flash') 
+pro_model = GenerativeModel('gemini-2.5-pro') 
 
 # --- Move Sanitizer Tool ---
 def call_move_sanitizer_tool(malformed_move, legal_moves_str):
