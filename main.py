@@ -28,6 +28,7 @@ app.config["SECRET_KEY"] = os.environ.get("FLASK_SECRET_KEY", secrets.token_hex(
 app.config["SESSION_TYPE"] = "filesystem" 
 app.config["SESSION_PERMANENT"] = False
 app.config["SESSION_USE_SIGNER"] = True
+app.config["SESSION_FILE_DIR"] = "/tmp/flask_session"
 
 # Initialize Session Extension
 Session(app)

@@ -21,6 +21,8 @@ steps:
       - '--platform'
       - 'managed'
       - '--allow-unauthenticated'
+      - '--set-env-vars'
+      - 'GOOGLE_CLOUD_PROJECT=$PROJECT_ID'
       # Vertex AI access requires no special flags if using default SA, 
       # but ensure the Cloud Run SA has "Vertex AI User" role.
 
