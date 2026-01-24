@@ -37,6 +37,19 @@
                 <button class="btn-primary" id="modal-new-game-btn">Play Again</button>
             </div>
         </div>
+
+        <!-- Intervention Modal (Dedicated) -->
+        <div id="intervention-modal" class="promotion-modal hidden">
+            <div class="promotion-content">
+                <h3 id="intervention-title">Wait! Coach Intervention 🛑</h3>
+                <p id="intervention-message" style="margin-bottom: 20px; color: var(--text-secondary);"></p>
+                <div style="display: flex; justify-content: center; gap: 10px;">
+                    <button class="btn-primary" id="intervention-ignore-btn">Ignore & Continue</button>
+                    <button class="btn-primary" id="intervention-undo-btn" style="background-color: #555;">Take Back
+                        Move</button>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -57,6 +70,18 @@
             </label>
             <label class="radio-label">
                 <input type="radio" name="playerColor" value="black"> Black
+            </label>
+        </div>
+        
+        <div class="color-selection">
+            <label class="radio-label">
+                <input type="radio" name="skillLevel" value="beginner" checked> Beginner
+            </label>
+            <label class="radio-label">
+                <input type="radio" name="skillLevel" value="intermediate"> Intermediate
+            </label>
+            <label class="radio-label">
+                <input type="radio" name="skillLevel" value="advanced"> Advanced
             </label>
         </div>
         <button class="btn-primary" id="new-game-btn" style="width: 100%;">New Game</button>

@@ -98,12 +98,19 @@ document.addEventListener('DOMContentLoaded', () => {
         // Read color selection
         const colorInput = document.querySelector('input[name="playerColor"]:checked');
         playerColor = colorInput ? colorInput.value : 'white';
+        
+        // Read skill level
+        const skillInput = document.querySelector('input[name="skillLevel"]:checked');
+        const skillLevel = skillInput ? skillInput.value : 'beginner';
 
         try {
             const response = await fetch('/api/new_game', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ player_color: playerColor })
+                body: JSON.stringify({ 
+                    player_color: playerColor,
+                    skill_level: skillLevel
+                })
             });
             const data = await response.json();
             if (data.status === 'success') {
@@ -435,44 +442,29 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function showInterventionModal(message) {
-        // Reuse Game Over or Promotion modal style for simplicity?
-        // Or inject a new one. Let's reuse Promotion modal structure via JS if possible, 
-        // logic is safer to just create a dynamic overlay or use `confirm`.
-        // `confirm` is blocking/ugly. Let's assume we have an 'intervention-modal'.
+    const interventionModal = document.getElementById('intervention-modal');
+    const interventionMessage = document.getElementById('intervention-message');
+    const interventionIgnoreBtn = document.getElementById('intervention-ignore-btn');
+    const interventionUndoBtn = document.getElementById('intervention-undo-btn');
 
-        // Quick Hack: Modify Game Over modal content temporarily
-        gameOverTitle.innerText = "Wait! Coach Intervention 🛑";
-        gameOverMessage.innerText = message;
-        modalNewGameBtn.innerText = "Ignore & Continue";
-
-        // Add a secondary button for "Undo"
-        let undoBtn = document.getElementById('modal-undo-btn');
-        if (!undoBtn) {
-            undoBtn = document.createElement('button');
-            undoBtn.id = 'modal-undo-btn';
-            undoBtn.className = 'btn-primary'; // Style it
-            undoBtn.style.backgroundColor = '#666'; // Grey logic
-            undoBtn.style.marginLeft = '10px';
-            undoBtn.innerText = "Take Back Move";
-            modalNewGameBtn.parentNode.appendChild(undoBtn);
-
-            undoBtn.addEventListener('click', async () => {
-                await fetch('/api/undo_move', { method: 'POST' });
-                gameOverModal.classList.add('hidden');
-                fetchGameState(); // Revert board
-            });
-        }
-
-        // Override "Ignore" behavior
-        modalNewGameBtn.onclick = async () => {
-            gameOverModal.classList.add('hidden');
-            // Restore default behavior
-            modalNewGameBtn.onclick = () => { gameOverModal.classList.add('hidden'); startNewGame(); };
+    if (interventionIgnoreBtn) {
+        interventionIgnoreBtn.addEventListener('click', () => {
+            interventionModal.classList.add('hidden');
             executeAIMove();
-        };
+        });
+    }
 
-        gameOverModal.classList.remove('hidden');
+    if (interventionUndoBtn) {
+        interventionUndoBtn.addEventListener('click', async () => {
+            interventionModal.classList.add('hidden');
+            await fetch('/api/undo_move', { method: 'POST' });
+            fetchGameState(); // Revert board
+        });
+    }
+
+    function showInterventionModal(message) {
+        interventionMessage.innerText = message;
+        interventionModal.classList.remove('hidden');
     }
 
     async function handlePromotionSelection(pieceName) {
