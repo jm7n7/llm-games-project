@@ -155,15 +155,23 @@ def process_move():
             # Note: We assess the move just made.
             future_coach = executor.submit(
                 coach_agent.analyze_move, 
-                fen_after_move, 
+                game_copy, 
                 str(game.move_history), 
                 last_move_san
             )
             
             # Task B: Opponent calculate reponse
+            # Pass a copy of the game to avoid thread safety issues if possible, 
+            # or rely on the fact that these are read-only analysis methods.
+            # Python's GIL helps, but deepcopy is safer if analysis modifies state temporarily (it does for move simulation!).
+            # The 'get_all_legal_moves_with_consequences' method DOES modify board state (make/unmake move).
+            # So we MUST pass a copy.
+            import copy
+            game_copy = copy.deepcopy(game)
+            
             future_ai = executor.submit(
                 opponent_agent.get_move, 
-                fen_after_move
+                game_copy
             )
             
             # Wait for results

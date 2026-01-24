@@ -11,6 +11,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const statusElement = document.getElementById('game-status');
     const turnIndicator = document.getElementById('turn-indicator');
 
+    // AI Reasoning
+    const aiReasoningModal = document.getElementById('ai-reasoning-modal');
+    const aiReasoningText = document.getElementById('ai-reasoning-text');
+
     // Modals
     const promotionModal = document.getElementById('promotion-modal');
     const promoBtns = document.querySelectorAll('.promo-btn');
@@ -96,6 +100,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
             if (data.status === 'success') {
                 gameOverModal.classList.add('hidden');
+                aiReasoningModal.classList.add('hidden'); // Reset AI dialog
                 // Clear board locally to force re-render with correct rotation if changed
                 initBoard();
                 fetchGameState();

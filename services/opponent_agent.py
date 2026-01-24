@@ -21,65 +21,56 @@ class OpponentAgent:
         # And replace prints at lines 59 and 68.
         pass
 
-    def get_move(self, fen: str, difficulty="hard"):
+    def get_move(self, game_state, difficulty="hard"):
         """
-        Gets a move from the LLM, verifies legality, and returns it.
+        Main "Brain" of the AI Opponent.
+        1. Generates rich data (Tactical Threats, Enhanced Moves).
+        2. Calls Router Agent to select personality (Best, Human, Blunder).
+        3. Calls Specialist Tool to get the move.
+        4. Validates/Repairs the move.
         """
-        board = chess.Board(fen)
-        legal_moves = [move.uci() for move in board.legal_moves]
-        move_history = [] # TODO: Pass history if needed for context
-        color = "White" if board.turn == chess.WHITE else "Black"
+        # Unwrap game state
+        # We need the actual game object to generate rich data.
+        # But here we might receive a FEN string if called from main.py's future_ai.
+        # Let's adjust main.py to pass the GAME object or let OpponentAgent re-create board from FEN?
+        # Re-creating board from FEN loses history and 3-fold rep, but sufficient for move generation.
+        # HOWEVER, the 'chess_logic' methods needs a 'self' that is a ChessGame instance to work effectively 
+        # (e.g. for is_in_check, etc which are on ChessGame).
+        # Actually chess_logic methods are on ChessGame.
+        # So we need to instantiate a temporary ChessGame from the FEN to use its analysis methods?
+        # Or we can use the `game` object if passed?
+        # Multi-threading issue: traversing the same `game` object in two threads is risky if it modifies state.
+        # But `get_tactical_threats` and others are read-only (mostly).
+        # Safer: Re-construct a temporary game instance for analysis.
         
-        # Call LLM
-        response = llm_service.get_move_recommendation(
-            fen=fen,
-            legal_moves=str(legal_moves),
-            move_history=str(move_history),
-            color=color,
-            model="gemini-2.5-pro"
-        )
+        fen = game_state if isinstance(game_state, str) else game_state.fen
         
-        if not response:
-            return None, "Thinking failed."
-            
-        # Parse response: Expected "Reasoning: ... || Move: <SAN/UCI>"
-        # We need to be robust.
-        try:
-            # Simple parsing strategy
-            if "|| Move:" in response:
-                parts = response.split("|| Move:")
-                reasoning = parts[0].replace("Reasoning:", "").strip()
-                move_str = parts[1].strip()
-            elif "Move:" in response:
-                parts = response.split("Move:")
-                reasoning = "I chose this move based on the position."
-                move_str = parts[1].strip()
-            else:
-                # Fallback: try to find a valid move in the text
-                move_str = response.strip()
-                reasoning = "Strategic choice."
+        # 1. Reconstruct Game for Analysis
+        from chess_logic import ChessGame
+        analysis_game = ChessGame()
+        # We need to set the board to the FEN.
+        # Board class doesn't have set_fen, but we can set grid manually or use python-chess to parse FEN 
+        # and populate the grid?
+        # Wait, our Board is custom.
+        # Actually, `chess_logic.py` is the one containing the analysis logic.
+        # If I can't easily populate our custom Board from FEN, I'm in trouble.
+        # BUT, the original code used `chess_logic` methods.
+        # Does `ChessGame` have `set_fen`? No.
+        # Does `Board` have `set_fen`? No.
+        # This is a gap. The original code ran in the SAME process flow, so it had the `game` object.
+        # Here we are in a thread. We CAN pass the `game` object from main.py, 
+        # but we must ensure we don't modify it. We can deepcopy it?
+        pass
 
-            # Verify legality (Sanitization)
-            # LLM might output SAN (e.g. Nf3) or UCI (e.g. g1f3)
-            # python-chess push_san handles SAN. push_uci handles UCI.
-            
-            try:
-                move = board.parse_san(move_str)
-            except:
-                try:
-                    move = board.parse_uci(move_str)
-                except:
-                    logger.warning(f"Invalid move format from LLM: {move_str}")
-                    return None, f"I tried to play {move_str} but it was illegal."
+        # Let's assume for now we change main.py to pass the `game` object copy or wrapper.
+        # For this step, I will implement the LOGIC assuming I have a valid `game` object.
+        # But wait, the method signature in main.py is `opponent_agent.get_move(fen_after_move)`.
+        # I should change that to pass the game.
+        
+        # Let's write the methods first assuming `game` is available.
+        # I'll stick to a placeholder "setup_analysis_game" for now.
+        
+        return None, "Not implemented fully yet"
 
-            if move in board.legal_moves:
-                return move.uci(), reasoning
-            else:
-                return None, f"Illegal move suggested: {move_str}"
-
-        except Exception as e:
-            logger.error(f"Error parsing opponent move: {e}")
-            return None, "Error processing move."
-
-# Singleton
-opponent_agent = OpponentAgent()
+    # Redefining to match the plan:
+    # I will replace the whole class to include the helper methods (Router, Specialist, etc)
