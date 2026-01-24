@@ -1,5 +1,6 @@
-from services.llm_service import llm_service
-import chess
+import logging
+
+logger = logging.getLogger(__name__)
 
 class OpponentAgent:
     def __init__(self):
@@ -7,6 +8,16 @@ class OpponentAgent:
         You are a Chess Grandmaster AI.
         Your goal is to play high-quality chess moves.
         """
+
+    def get_move(self, fen: str, difficulty="hard"):
+        # ... (lines 11-58 omitted for brevity in thought, but I must keep them or target specific chunks)
+        # Wait, I can't easily replace the top imports AND the bottom prints in one chunk if they are far apart
+        # without including the whole file content in replacement, which is risky if I get it wrong.
+        # The file is small (73 lines). I can replace the whole file or do 2 chunks.
+        # "OpponentAgent" class starts line 4.
+        # I will add import at top.
+        # And replace prints at lines 59 and 68.
+        pass
 
     def get_move(self, fen: str, difficulty="hard"):
         """
@@ -56,7 +67,7 @@ class OpponentAgent:
                 try:
                     move = board.parse_uci(move_str)
                 except:
-                    print(f"Invalid move format from LLM: {move_str}")
+                    logger.warning(f"Invalid move format from LLM: {move_str}")
                     return None, f"I tried to play {move_str} but it was illegal."
 
             if move in board.legal_moves:
@@ -65,7 +76,7 @@ class OpponentAgent:
                 return None, f"Illegal move suggested: {move_str}"
 
         except Exception as e:
-            print(f"Error parsing opponent move: {e}")
+            logger.error(f"Error parsing opponent move: {e}")
             return None, "Error processing move."
 
 # Singleton

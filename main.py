@@ -5,6 +5,12 @@ from flask import Flask, render_template, request, jsonify, session
 from flask_session import Session
 from dotenv import load_dotenv
 
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 # Import Project Logic
 from chess_logic import ChessGame
 
@@ -25,7 +31,7 @@ Session(app)
 
 # Ensure Google API Key is present
 if 'GOOGLE_API_KEY' not in os.environ:
-    print("WARNING: GOOGLE_API_KEY not found in environment variables.")
+    logger.warning("GOOGLE_API_KEY not found in environment variables.")
 
 # --- Routes ---
 
@@ -162,12 +168,12 @@ def process_move():
             try:
                 coach_result = future_coach.result(timeout=10) # 10s timeout
             except Exception as e:
-                print(f"Coach failed: {e}")
+                logger.error(f"Coach failed: {e}")
                 
             try:
                 ai_move_result, ai_reasoning = future_ai.result(timeout=10)
             except Exception as e:
-                print(f"AI failed: {e}")
+                logger.error(f"AI failed: {e}")
 
     # 3. Store AI move in session for confirmation
     session['pending_ai_move'] = ai_move_result
