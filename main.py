@@ -1,23 +1,24 @@
+
 import os
 import secrets
 import json
+import logging
+import copy
+from concurrent.futures import ThreadPoolExecutor
 from flask import Flask, render_template, request, jsonify, session
 from flask_session import Session
 from dotenv import load_dotenv
 
-import logging
+# Import Project Logic
+from chess_logic import ChessGame
+from services import coach_agent, opponent_agent
+
+# Load environment variables
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# Import Project Logic
-from chess_logic import ChessGame
-from services.coach_agent import coach_agent
-from services.opponent_agent import opponent_agent
-
-# Load environment variables
-load_dotenv()
 
 # Initialize Flask App
 app = Flask(__name__)
@@ -31,9 +32,32 @@ app.config["SESSION_USE_SIGNER"] = True
 # Initialize Session Extension
 Session(app)
 
-# Ensure Google API Key is present
-if 'GOOGLE_API_KEY' not in os.environ:
-    logger.warning("GOOGLE_API_KEY not found in environment variables.")
+# Ensure Google Cloud Project is set
+if 'GOOGLE_CLOUD_PROJECT' not in os.environ:
+    logger.warning("GOOGLE_CLOUD_PROJECT not found in environment variables. Vertex AI calls may fail.")
+
+# Helper for AI worker
+def ai_worker(game_copy, skill_level):
+    """
+    Worker function to calculate AI move in a separate thread.
+    This includes the expensive 'get_all_legal_moves_with_consequences' call.
+    """
+    # 1. Calculate the 'ground truth' for the AI (Move Consequence Mapping)
+    enhanced_moves = game_copy.get_all_legal_moves_with_consequences(game_copy.turn)
+    
+    # 2. Calculate tactical threats (Dangers List)
+    tactical_threats = game_copy.get_tactical_threats(game_copy.turn)
+    
+    # 3. Get simple list of legal moves for validation
+    legal_moves_simple = [m['move'] for m in enhanced_moves]
+    
+    # 4. Call the Agent
+    return opponent_agent.get_ai_move(
+        json.dumps(enhanced_moves),
+        json.dumps(tactical_threats),
+        legal_moves_simple,
+        skill_level
+    )
 
 # --- Routes ---
 
@@ -56,12 +80,18 @@ def new_game():
     
     data = request.json or {}
     session['player_color'] = data.get('player_color', 'white')
+    session['user_skill_level'] = data.get('skill_level', 'beginner') # Default to beginner
     
+    # Reset chat history logic if we were storing it in session, 
+    # but the frontend seems to manage chat display. 
+    # The Coach agent is stateless per request mostly (except for Q&A context).
+    session['chat_context'] = [] 
+
     return jsonify({
         "status": "success", 
         "message": "New game started",
         "turn": game.turn,
-        "fen": game._get_board_state_string() # We might need a better serializer
+        "fen": game._get_board_state_string()
     })
 
 @app.route('/api/state', methods=['GET'])
@@ -72,7 +102,6 @@ def get_state():
         return jsonify({"status": "error", "message": "No active game"}), 404
         
     # Build a simple grid representation for the frontend
-    # (Or we can send FEN and let the frontend parse it, but grid is easier for custom UI)
     grid = []
     for r in range(8):
         row = []
@@ -94,28 +123,19 @@ def get_state():
         "grid": grid,
         "history": game.move_history,
         "game_over": game.game_over,
-        "in_check": game.is_in_check(game.turn), # ADDED
-        "winner": 'draw' if "draw" in game.status_message.lower() else ('white' if game.turn == 'black' else 'black') if game.game_over else None, # ADDED simple winner logic
+        "in_check": game.is_in_check(game.turn),
+        "winner": 'draw' if "draw" in game.status_message.lower() else ('white' if game.turn == 'black' else 'black') if game.game_over else None,
         "status_message": game.status_message
     })
-
-@app.route('/api/move', methods=['POST'])
-def make_move():
-    """Handles a player move."""
-    game = session.get('chess_game')
-    if not game:
-        return jsonify({"status": "error", "message": "No active game"}), 404
-        
-from concurrent.futures import ThreadPoolExecutor
-import json
 
 @app.route('/api/process_move', methods=['POST'])
 def process_move():
     """
     Orchestrates the turn:
-    1. Makes Human Move.
-    2. Runs Agent Analysis & AI Move Search in Parallel.
-    3. Returns Intervention status.
+    1. Pre-Move: Calculate context for Coach (dangers/options BEFORE move).
+    2. Move: Apply Human Move.
+    3. Parallel Analysis: Run Coach (analyzing the move) and Opponent (thinking).
+    4. Return: Coach feedback and AI move.
     """
     game = session.get('chess_game')
     if not game:
@@ -131,71 +151,94 @@ def process_move():
     start_tuple = tuple(start_pos)
     end_tuple = tuple(end_pos)
     
-    # 1. Apply Human Move
+    # --- 1. Pre-Move Context (For Coach) ---
+    # The coach needs to know what the dangers were *before* the user moved.
+    dangers_before = game.get_tactical_threats(game.turn)
+    options_before = game.get_all_legal_moves_with_consequences(game.turn)
+    
+    # --- 2. Apply Human Move ---
+    game.store_pre_move_state()
     success, message = game.make_move(start_tuple, end_tuple)
     
     if not success:
         return jsonify({"status": "invalid", "message": message}), 400
         
-    # Get last move info for analyis
-    last_move_san = game.move_history[-1] if game.move_history else "Unknown"
-    fen_after_move = game.fen
+    # Get move data for the Coach (the move that was just made)
+    last_move_data = game.game_data[-1] if game.game_data else {}
     
-    # 2. Parallel Execution (Coach Analysis + Opponent Think)
-    coach_result = {"type": "normal", "message": ""}
-    ai_move_result = None
+    # --- 3. Parallel Execution (Coach & Opponent) ---
+    coach_feedback = {"response_type": "silent", "message": None}
+    ai_move_packet = None
     ai_reasoning = ""
     
-    if not game.game_over:
-        with ThreadPoolExecutor() as executor:
-            # We assume AI plays the opposite color of the human (who just moved)
-            # So game.turn is now the AI's turn.
-            
-            # Task A: Coach checks for blunders in the HUMAN'S move (just made)
-            # Note: We assess the move just made.
-            future_coach = executor.submit(
-                coach_agent.analyze_move, 
-                game_copy, 
-                str(game.move_history), 
-                last_move_san
-            )
-            
-            # Task B: Opponent calculate reponse
-            # Pass a copy of the game to avoid thread safety issues if possible, 
-            # or rely on the fact that these are read-only analysis methods.
-            # Python's GIL helps, but deepcopy is safer if analysis modifies state temporarily (it does for move simulation!).
-            # The 'get_all_legal_moves_with_consequences' method DOES modify board state (make/unmake move).
-            # So we MUST pass a copy.
-            import copy
+    user_skill = session.get('user_skill_level', 'beginner')
+    player_color = session.get('player_color', 'white')
+
+    with ThreadPoolExecutor() as executor:
+        # Task A: Coach Agent
+        # Analyzes the move just made, using the "before" context.
+        future_coach = executor.submit(
+            coach_agent.get_coaching_packet,
+            last_move_data,
+            json.dumps(dangers_before),
+            json.dumps(options_before),
+            user_skill,
+            player_color
+        )
+        
+        # Task B: Opponent Agent (AI)
+        # Calculates the response move. only if game is not over.
+        future_ai = None
+        if not game.game_over:
+            # We MUST pass a deepcopy because 'ai_worker' will modify the board 
+            # (simulating moves) and we don't want to corrupt the session game state 
+            # or cause race conditions if we were doing other things.
             game_copy = copy.deepcopy(game)
             
             future_ai = executor.submit(
-                opponent_agent.get_move, 
-                game_copy
+                ai_worker,
+                game_copy,
+                user_skill
             )
             
-            # Wait for results
+        # Wait for results (Coach)
+        try:
+            coach_feedback = future_coach.result(timeout=15)
+        except Exception as e:
+            logger.error(f"Coach failed: {e}")
+            coach_feedback = {"response_type": "silent", "message": None}
+            
+        # Wait for results (AI)
+        if future_ai:
             try:
-                coach_result = future_coach.result(timeout=10) # 10s timeout
-            except Exception as e:
-                logger.error(f"Coach failed: {e}")
-                
-            try:
-                ai_move_result, ai_reasoning = future_ai.result(timeout=10)
+                ai_packet = future_ai.result(timeout=30) # AI might take longer
+                if ai_packet:
+                    ai_move_packet = ai_packet.get("move")
+                    ai_reasoning = ai_packet.get("reasoning")
             except Exception as e:
                 logger.error(f"AI failed: {e}")
 
-    # 3. Store AI move in session for confirmation
-    session['pending_ai_move'] = ai_move_result
+    # --- 4. Handle Results ---
+    
+    # Store AI move in session for confirmation step
+    session['pending_ai_move'] = ai_move_packet
     session['pending_ai_reasoning'] = ai_reasoning
     session['chess_game'] = game # Save state
     
+    # Simplified feedback/intervention logic
+    # The frontend expects {status, coach_feedback, ai_move, ...}
+    
     return jsonify({
         "status": "success",
-        "fen": game.fen,
+        "fen": game._get_board_state_string(),
         "game_over": game.game_over,
-        "coach_feedback": coach_result,  # {type, message}
-        "ai_move": ai_move_result if coach_result.get('type') != 'intervention' else None,
+        "coach_feedback": {
+            "type": coach_feedback.get("response_type", "silent"),
+            "message": coach_feedback.get("message")
+        },
+        # If the coach intervenes ("blunder"), we do NOT show/execute the AI move yet.
+        # The frontend will show the intervention modal.
+        "ai_move": ai_move_packet if coach_feedback.get("response_type") != "intervention" else None,
         "ai_reasoning": ai_reasoning
     })
 
@@ -208,49 +251,46 @@ def confirm_ai_move():
     if not game or not ai_move_uci:
         return jsonify({"status": "error", "message": "No pending AI move"}), 400
         
-    # Helper to convert UCI to coords (duplicated logic, should serve refactor)
-    def uci_to_coords(uci):
-        files = 'abcdefgh'
-        c1 = files.index(uci[0])
-        r1 = 8 - int(uci[1])
-        c2 = files.index(uci[2])
-        r2 = 8 - int(uci[3])
-        return (r1, c1), (r2, c2)
+    # Helper to convert UCI-like "e2-e4" to coords
+    def notation_to_coords(notation_str):
+        if '-' not in notation_str: return None, None
+        start_str, end_str = notation_str.split('-')
         
-    start, end = uci_to_coords(ai_move_uci)
-    success, msg = game.make_move(start, end)
+        def parse(sq):
+            files = 'abcdefgh'
+            c = files.index(sq[0])
+            r = 8 - int(sq[1])
+            return (r, c)
+            
+        return parse(start_str), parse(end_str)
+        
+    start, end = notation_to_coords(ai_move_uci)
+    if start and end:
+        success, msg = game.make_move(start, end)
+        
+        # Auto-promote (simplified for AI)
+        if game.promotion_pending:
+            game.promote_pawn("Queen") 
     
-    # Auto-promote
-    if len(ai_move_uci) == 5:
-        game.promote_pawn("Queen") # Simplified default
-        
     session['pending_ai_move'] = None # Clear
     session['chess_game'] = game
     
     return jsonify({
         "status": "success", 
         "move": ai_move_uci,
-        "fen": game.board.fen()
+        "fen": game._get_board_state_string()
     })
 
 @app.route('/api/undo_move', methods=['POST'])
 def undo_move():
-    """Reverts the last move."""
+    """Reverts the last move using the stored pre-move state."""
     game = session.get('chess_game')
     if game:
-        # Assuming ChessGame has undo logic. From previous files, I recall distinct state methods.
-        # Streamlit app used `game.revert_to_pre_move_state()` but that was for specific flow.
-        # python-chess board.pop() works if history kept.
-        # Let's try basic pop if available, or just reload game.
-        try:
-            game.board.pop() # Undo last move
-            game.move_history.pop()
-            game.turn = 'white' if game.turn == 'black' else 'black' # Toggle back
-            session['chess_game'] = game
-            return jsonify({"status": "success", "fen": game.board.fen()})
-        except:
-            return jsonify({"status": "error", "message": "Cannot undo"}), 400
-    return jsonify({"status": "error"}), 404
+        game.revert_to_pre_move_state()
+        session['chess_game'] = game
+        return jsonify({"status": "success", "fen": game._get_board_state_string()})
+        
+    return jsonify({"status": "error"}), 400
 
 @app.route('/api/legal_moves', methods=['POST'])
 def get_legal_moves():
@@ -271,20 +311,17 @@ def get_legal_moves():
     if not piece or piece.color != game.turn:
         return jsonify({"status": "success", "moves": []})
         
-    # Get all valid moves for the piece using existing logic
-    # The existing get_valid_moves usually returns raw moves, but doesn't check for checkmate/checks on self
-    # We need to filter by game.move_puts_king_in_check like the streamlit app did
-    
     raw_moves = piece.get_valid_moves(game.board, game)
     legal_moves = []
     
     for move in raw_moves:
+        # Check if move puts *own* king in check (illegal)
         if not game.move_puts_king_in_check((r, c), move):
             legal_moves.append(move)
             
     return jsonify({
         "status": "success",
-        "moves": legal_moves # Returns list of [row, col]
+        "moves": legal_moves 
     })
 
 @app.route('/api/promote', methods=['POST'])
@@ -295,7 +332,7 @@ def promote_pawn():
         return jsonify({"status": "error", "message": "No active game"}), 404
         
     data = request.json
-    piece_choice = data.get('promotion') # e.g., 'Queen', 'Rook', etc.
+    piece_choice = data.get('promotion') 
     
     if not piece_choice:
         return jsonify({"status": "error", "message": "Missing promotion choice"}), 400
@@ -314,6 +351,33 @@ def promote_pawn():
             "status": "error",
             "message": message
         })
+
+@app.route('/api/chat', methods=['POST'])
+def chat():
+    """Handles Q&A with Coach."""
+    game = session.get('chess_game')
+    if not game:
+         return jsonify({"status": "error", "response": "Start a game first!"})
+         
+    user_query = request.json.get('message')
+    user_skill = session.get('user_skill_level', 'beginner')
+    player_color = session.get('player_color', 'white')
+    
+    # Build context
+    context = {
+        "user_skill_level": user_skill,
+        "player_color": player_color,
+        "last_ai_reasoning": session.get('pending_ai_reasoning', ""), # Might be stale
+        "current_turn": game.turn,
+        # Live analysis for Q&A
+        "dangers_list": json.dumps(game.get_tactical_threats(game.turn)),
+        "options_list": json.dumps(game.get_all_legal_moves_with_consequences(game.turn))
+    }
+    
+    response_packet = coach_agent.get_qa_response(user_query, json.dumps(context))
+    response_text = response_packet.get("commentary", "I'm thinking...")
+    
+    return jsonify({"status": "success", "response": response_text})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080, debug=True)

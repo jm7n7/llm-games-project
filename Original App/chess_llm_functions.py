@@ -2,15 +2,10 @@ import os
 import json
 import google.generativeai as genai
 
-# --- VERTEX AI CONFIG ---
-# Using project ID and location credentials instead of API key
-PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT")
-LOCATION = os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1")
-
-if PROJECT_ID:
-    genai.configure(project=PROJECT_ID, location=LOCATION)
-else:
-    print("Warning: GOOGLE_CLOUD_PROJECT not set, Vertex AI may fail.")
+# --- API KEY CONFIG ---
+# This is set in app.py or by the environment
+GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
+genai.configure(api_key=GOOGLE_API_KEY)
 
 # --- MODEL INITIALIZATION ---
 # Using Flash for speed-sensitive tasks
