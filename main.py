@@ -5,13 +5,14 @@ import json
 import logging
 import copy
 from concurrent.futures import ThreadPoolExecutor
-from flask import Flask, render_template, request, jsonify, session
+from flask import Flask, render_template, request, jsonify, session, redirect
 from flask_session import Session
 from dotenv import load_dotenv
+from flask_mail import Mail, Message
 
 # Import Project Logic
 from chess_logic import ChessGame
-from services import coach_agent, opponent_agent
+from services import coach_agent, opponent_agent, user_service
 
 # Load environment variables
 load_dotenv()
@@ -36,6 +37,16 @@ Session(app)
 # Ensure Google Cloud Project is set
 if 'GOOGLE_CLOUD_PROJECT' not in os.environ:
     logger.warning("GOOGLE_CLOUD_PROJECT not found in environment variables. Vertex AI calls may fail.")
+
+# --- Flask Mail Config ---
+app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
+app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', 587))
+app.config['MAIL_USE_TLS'] = os.environ.get('MAIL_USE_TLS', 'True').lower() == 'true'
+app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
+app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
+app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_USERNAME')
+
+mail = Mail(app)
 
 # Helper for AI worker
 def ai_worker(game_copy, skill_level):
@@ -65,6 +76,8 @@ def ai_worker(game_copy, skill_level):
 @app.route('/')
 def index():
     """Renders the main game page."""
+    if 'user_id' not in session:
+        return redirect('/login')
     return render_template('index.html')
 
 @app.route('/health')
@@ -324,6 +337,82 @@ def get_legal_moves():
         "status": "success",
         "moves": legal_moves 
     })
+
+@app.route('/login')
+def login_page():
+    return render_template('login.html')
+
+@app.route('/signup')
+def signup_page():
+    return render_template('signup.html')
+
+@app.route('/api/signup', methods=['POST'])
+def api_signup():
+    data = request.json
+    username = data.get('username')
+    email = data.get('email')
+    firstname = data.get('firstname')
+    
+    if not username or not email:
+        return jsonify({"status": "error", "message": "Missing fields"}), 400
+        
+    password = user_service.create_user(username, email, firstname)
+    if password:
+        return jsonify({"status": "success", "password": password})
+    else:
+        return jsonify({"status": "error", "message": "User exists or storage error"}), 400
+
+@app.route('/api/login', methods=['POST'])
+def api_login():
+    # Supports both FORM submit (for standard login) and JSON (if needed)
+    if request.is_json:
+        data = request.json
+        username = data.get('username')
+        password = data.get('password')
+    else:
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+    user = user_service.authenticate_user(username, password)
+    
+    if user:
+        session['user_id'] = username
+        session['email'] = user.get('email')
+        
+        if request.is_json:
+            return jsonify({"status": "success"})
+        else:
+            return redirect('/')
+            
+    if request.is_json:
+        return jsonify({"status": "error", "message": "Invalid credentials"}), 401
+    else:
+        return redirect('/login') # Could add query param for error
+
+@app.route('/api/logout', methods=['POST'])
+def api_logout():
+    session.clear()
+    return jsonify({"status": "success"})
+
+@app.route('/api/forgot_password', methods=['POST'])
+def api_forgot_password():
+    data = request.json
+    username = data.get('username')
+    
+    email, new_password = user_service.reset_password(username)
+    
+    if email and new_password:
+        try:
+            msg = Message("RooChess Password Reset", recipients=[email])
+            msg.body = f"Hello,\n\nYour RooChess password has been reset.\n\nNew Password: {new_password}\n\nPlease log in with this password."
+            mail.send(msg)
+            return jsonify({"status": "success", "message": f"Password reset! Email sent to {email}"})
+        except Exception as e:
+            logger.error(f"Email failed: {e}")
+            return jsonify({"status": "error", "message": "Failed to send email. please contact admin."}), 500
+    else:
+        # Don't reveal if user exists or not for security, but for now:
+        return jsonify({"status": "error", "message": "User not found"}), 404
 
 @app.route('/api/promote', methods=['POST'])
 def promote_pawn():

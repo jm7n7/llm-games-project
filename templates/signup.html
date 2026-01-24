@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RooChess - Sign Up</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-image: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            margin: 0;
+            color: white;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .auth-card {
+            background-color: #1f2937;
+            padding: 2.5rem;
+            border-radius: 12px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+            width: 100%;
+            max-width: 450px;
+            text-align: center;
+        }
+
+        .auth-header h1 {
+            color: #f3f4f6;
+            margin-top: 0;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+            text-align: left;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #e5e7eb;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 6px;
+            border: 1px solid #374151;
+            background-color: #111827;
+            color: white;
+            font-size: 1rem;
+            box-sizing: border-box;
+        }
+
+        .btn-primary-auth {
+            width: 100%;
+            padding: 0.75rem;
+            background-color: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        .btn-secondary-auth {
+            background-color: #4b5563;
+        }
+
+        /* Success View */
+        .success-view {
+            display: none;
+            text-align: center;
+        }
+
+        .password-display {
+            background-color: #111827;
+            border: 2px dashed #3b82f6;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 1.5rem;
+            color: #60a5fa;
+            letter-spacing: 2px;
+            word-break: break-all;
+        }
+
+        .copy-btn {
+            background: transparent;
+            border: 1px solid #4b5563;
+            color: #9ca3af;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            margin-top: 10px;
+        }
+
+        .copy-btn:hover {
+            color: white;
+            border-color: white;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="auth-card">
+        <!-- Form View -->
+        <div id="signup-form-view">
+            <div class="auth-header">
+                <h1>Create Account</h1>
+                <p style="color:#9ca3af;">We'll generate a secure password for you.</p>
+            </div>
+
+            <form id="signupForm">
+                <div class="form-group">
+                    <label class="form-label" for="username">Username</label>
+                    <input type="text" id="username" name="username" class="form-input" required
+                        placeholder="ChessMaster2000">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="email">Email</label>
+                    <input type="email" id="email" name="email" class="form-input" required
+                        placeholder="you@example.com">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="firstname">First Name</label>
+                    <input type="text" id="firstname" name="firstname" class="form-input" required placeholder="Magnus">
+                </div>
+
+                <button type="submit" class="btn-primary-auth">Create Account</button>
+            </form>
+
+            <p style="margin-top:20px; color:#9ca3af;">
+                Already have an account? <a href="/login" style="color:#60a5fa;">Log In</a>
+            </p>
+        </div>
+
+        <!-- Success View -->
+        <div id="success-view" class="success-view">
+            <h2 style="color:#10b981;">Account Created!</h2>
+            <p style="color:#e5e7eb;">Here is your secure password. <br><strong>Save it now</strong>, it will not be
+                shown again.</p>
+
+            <div class="password-display" id="generated-password">
+                LOADING...
+            </div>
+
+            <button class="copy-btn" id="copy-btn">Copy to Clipboard</button>
+
+            <div style="margin-top: 2rem;">
+                <a href="/login" style="text-decoration: none;">
+                    <button class="btn-primary-auth">Go to Login</button>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('signupForm');
+        const formView = document.getElementById('signup-form-view');
+        const successView = document.getElementById('success-view');
+        const passDisplay = document.getElementById('generated-password');
+        const copyBtn = document.getElementById('copy-btn');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const submitBtn = form.querySelector('button[type="submit"]');
+            submitBtn.innerText = "Creating...";
+
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData.entries());
+
+            try {
+                const response = await fetch('/api/signup', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    // Show success view
+                    formView.style.display = 'none';
+                    successView.style.display = 'block';
+                    passDisplay.innerText = result.password;
+                } else {
+                    alert("Error: " + result.message);
+                    submitBtn.innerText = "Create Account";
+                }
+            } catch (err) {
+                console.error(err);
+                alert("Connection error.");
+                submitBtn.innerText = "Create Account";
+            }
+        });
+
+        copyBtn.addEventListener('click', () => {
+            navigator.clipboard.writeText(passDisplay.innerText).then(() => {
+                copyBtn.innerText = "Copied!";
+                setTimeout(() => copyBtn.innerText = "Copy to Clipboard", 2000);
+            });
+        });
+    </script>
+</body>
+
+</html>

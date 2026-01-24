@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RooChess - Login</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        /* Reusing common styles from style.css where possible, adding Auth-specifics */
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-image: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            margin: 0;
+            color: white;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .auth-card {
+            background-color: #1f2937;
+            padding: 2.5rem;
+            border-radius: 12px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+
+        .auth-header h1 {
+            margin-top: 0;
+            font-size: 1.8rem;
+            color: #f3f4f6;
+        }
+
+        .auth-header p {
+            color: #9ca3af;
+            margin-bottom: 2rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+            text-align: left;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #e5e7eb;
+            font-size: 0.9rem;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 6px;
+            border: 1px solid #374151;
+            background-color: #111827;
+            color: white;
+            font-size: 1rem;
+            box-sizing: border-box;
+            /* Important for padding */
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+        }
+
+        .btn-primary-auth {
+            width: 100%;
+            padding: 0.75rem;
+            background-color: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-primary-auth:hover {
+            background-color: #2563eb;
+        }
+
+        .links {
+            margin-top: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.8rem;
+            font-size: 0.9rem;
+        }
+
+        .link-text {
+            color: #60a5fa;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .link-text:hover {
+            text-decoration: underline;
+        }
+
+        /* Modal for Forgot Password */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .modal-content {
+            background: #1f2937;
+            padding: 2rem;
+            border-radius: 12px;
+            max-width: 350px;
+            width: 90%;
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="auth-card">
+        <div class="auth-header">
+            <h1>RooChess AI</h1>
+            <p>Log in to your account</p>
+        </div>
+
+        <form action="/api/login" method="POST" id="loginForm">
+            <div class="form-group">
+                <label class="form-label" for="username">Username</label>
+                <input type="text" id="username" name="username" class="form-input" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="password">Password</label>
+                <input type="password" id="password" name="password" class="form-input" required>
+            </div>
+
+            <button type="submit" class="btn-primary-auth">Login</button>
+        </form>
+
+        <div class="links">
+            <div>
+                Don't have an account? <a href="/signup" class="link-text">Create Account</a>
+            </div>
+            <div>
+                <span id="forgot-btn" class="link-text">Forgot Password?</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Forgot Password Modal -->
+    <div id="forgot-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <h3>Reset Password</h3>
+            <p style="color: #9ca3af; font-size: 0.9rem; margin-bottom: 20px;">
+                Enter your username. We will generate a new password and email it to you.
+            </p>
+            <input type="text" id="forgot-username" class="form-input" placeholder="Username"
+                style="margin-bottom: 15px;">
+            <div style="display: flex; gap: 10px;">
+                <button id="cancel-reset" class="btn-primary-auth" style="background-color: #4b5563;">Cancel</button>
+                <button id="confirm-reset" class="btn-primary-auth">Send Email</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Use Fetch for login to handle errors gracefully without reload if needed, 
+        // or just let form submit. Form submit is simpler for basic auth if we redirect.
+        // Let's intercept form for better error handling UI.
+        const loginForm = document.getElementById('loginForm');
+
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(loginForm);
+
+            try {
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    window.location.href = '/';
+                } else {
+                    alert("Login failed: " + (data.message || "Unknown error"));
+                }
+            } catch (err) {
+                console.error(err);
+                alert("Connection error.");
+            }
+        });
+
+        // Forgot Password Logic
+        const forgotBtn = document.getElementById('forgot-btn');
+        const forgotModal = document.getElementById('forgot-modal');
+        const cancelReset = document.getElementById('cancel-reset');
+        const confirmReset = document.getElementById('confirm-reset');
+        const forgotUser = document.getElementById('forgot-username');
+
+        forgotBtn.addEventListener('click', () => forgotModal.classList.remove('hidden'));
+        cancelReset.addEventListener('click', () => forgotModal.classList.add('hidden'));
+
+        confirmReset.addEventListener('click', async () => {
+            const username = forgotUser.value;
+            if (!username) return alert("Please enter username");
+
+            confirmReset.innerText = "Sending...";
+
+            try {
+                const response = await fetch('/api/forgot_password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username })
+                });
+                const data = await response.json();
+                alert(data.message);
+                forgotModal.classList.add('hidden');
+                confirmReset.innerText = "Send Email";
+            } catch (err) {
+                alert("Error sending request.");
+            }
+        });
+    </script>
+</body>
+
+</html>

@@ -4,3 +4,6 @@ google-cloud-aiplatform
 gunicorn
 python-dotenv
 chess
+google-cloud-storage
+flask-mail
+bcrypt
