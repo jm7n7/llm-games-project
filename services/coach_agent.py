@@ -1,3 +1,7 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
 from services.llm_service import llm_service
 
 class CoachAgent:
@@ -71,7 +75,8 @@ class CoachAgent:
             clean = re.sub(r'```json|```', '', response_text).strip()
             data = json.loads(clean)
             return data
-        except:
+        except Exception as e:
+            logger.error(f"Coach Agent JSON parse error: {e}. Raw: {response_text}")
             return {"type": "normal", "message": response_text}
 
 # Singleton

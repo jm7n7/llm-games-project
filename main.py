@@ -13,6 +13,8 @@ logger = logging.getLogger(__name__)
 
 # Import Project Logic
 from chess_logic import ChessGame
+from services.coach_agent import coach_agent
+from services.opponent_agent import opponent_agent
 
 # Load environment variables
 load_dotenv()
