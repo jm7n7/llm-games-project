@@ -346,8 +346,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function makeMove(start, end) {
         try {
-            // Optimistic update handled by caller? No, usually not for this complex flow.
-            // Let's assume we wait for server to allow intervention check.
+            // 1. Optimistic UI Update
+            // Move piece visually immediately to feel responsive
+            const startSq = getSquareByLogicalCoords(start[0], start[1]);
+            const endSq = getSquareByLogicalCoords(end[0], end[1]);
+            const piece = startSq.querySelector('.piece');
+
+            if (piece && endSq) {
+                // Remove any captured piece visually
+                const captured = endSq.querySelector('.piece');
+                if (captured) captured.remove();
+
+                // Move the piece
+                endSq.appendChild(piece);
+
+                // Play sound? (Optional)
+            }
+
+            // Show "Thinking" status
+            statusElement.innerText = "AI is thinking... 🤖";
+            statusElement.classList.add('pulse'); // You might need to add this class in CSS or just use text
 
             const response = await fetch('/api/process_move', {
                 method: 'POST',
@@ -356,9 +374,12 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             const data = await response.json();
 
+            // Remove pulse
+            statusElement.classList.remove('pulse');
+
             if (data.status === 'success') {
                 // Move Valid
-                fetchGameState(); // Update board state immediately (Human move)
+                fetchGameState(); // Sync truth (will correct any visual glitches)
 
                 const feedback = data.coach_feedback;
                 if (feedback && feedback.message) {
@@ -367,29 +388,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (feedback.type === 'intervention') {
                     // --- INTERVENTION ---
-                    // Show modal, don't play AI move yet
                     showInterventionModal(feedback.message);
                 } else if (data.ai_move) {
                     // --- NO INTERVENTION ---
-                    // Play AI move immediately
-                    setTimeout(() => {
-                        // We handled AI move logic in backend confirmation? 
-                        // Actually, process_move returns ai_move BUT doesn't apply it to board?
-                        // Wait, my backend logic:
-                        // "3. Store AI move in session... return ai_move if no intervention"
-                        // But we didn't apply it to the board object in Python? 
-                        // Ah, the Python code calls game.make_move for HUMAN, but only calculates AI.
-                        // So we need to execute the AI move now.
+                    // Show "AI Moving..." status
+                    statusElement.innerText = "AI Moving...";
 
+                    setTimeout(() => {
                         executeAIMove();
                     }, 800);
                 }
             } else {
                 console.warn("Invalid move:", data.message);
-                // Revert UI if needed
+                // Revert UI by re-fetching state
+                fetchGameState();
+                statusElement.innerText = "Invalid Move";
             }
         } catch (error) {
             console.error("Error making move:", error);
+            fetchGameState(); // Revert on error
         }
     }
 

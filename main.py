@@ -178,8 +178,6 @@ def process_move():
                 logger.error(f"AI failed: {e}")
 
     # 3. Store AI move in session for confirmation
-    logger.info(f"AI Move Result: {ai_move_result}, Coach Result: {coach_result}")
-    
     session['pending_ai_move'] = ai_move_result
     session['pending_ai_reasoning'] = ai_reasoning
     session['chess_game'] = game # Save state
@@ -199,10 +197,7 @@ def confirm_ai_move():
     game = session.get('chess_game')
     ai_move_uci = session.get('pending_ai_move')
     
-    logger.info(f"Confirming AI Move: {ai_move_uci}")
-    
     if not game or not ai_move_uci:
-        logger.warning("Confirm AI Move failed: Missing game or move.")
         return jsonify({"status": "error", "message": "No pending AI move"}), 400
         
     # Helper to convert UCI to coords (duplicated logic, should serve refactor)

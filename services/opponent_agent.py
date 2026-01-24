@@ -1,4 +1,6 @@
 import logging
+import chess
+from services.llm_service import llm_service
 
 logger = logging.getLogger(__name__)
 
