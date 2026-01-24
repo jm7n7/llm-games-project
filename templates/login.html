@@ -191,23 +191,30 @@
 
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+            // Convert FormData to JSON object
             const formData = new FormData(loginForm);
+            const data = Object.fromEntries(formData.entries());
 
             try {
                 const response = await fetch('/api/login', {
                     method: 'POST',
-                    body: formData
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
                 });
-                const data = await response.json();
 
-                if (data.status === 'success') {
+                // Check if response is ok (status 200-299)
+                if (!response.ok) {
+                    const errData = await response.json();
+                    throw new Error(errData.message || "Login failed");
+                }
+
+                const result = await response.json();
+                if (result.status === 'success') {
                     window.location.href = '/';
-                } else {
-                    alert("Login failed: " + (data.message || "Unknown error"));
                 }
             } catch (err) {
                 console.error(err);
-                alert("Connection error.");
+                alert(err.message || "Connection error.");
             }
         });
 
