@@ -1,22 +1,19 @@
 import os
 import json
-import google.generativeai as genai
+import vertexai
+from vertexai.generative_models import GenerativeModel
 
-# --- VERTEX AI CONFIG ---
-# Using project ID and location credentials instead of API key
+# --- API KEY CONFIG ---
+# This is set in app.py or by the environment
 PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT")
 LOCATION = os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1")
-
-if PROJECT_ID:
-    genai.configure(project=PROJECT_ID, location=LOCATION)
-else:
-    print("Warning: GOOGLE_CLOUD_PROJECT not set, Vertex AI may fail.")
+vertexai.init(project=PROJECT_ID, location=LOCATION)
 
 # --- MODEL INITIALIZATION ---
 # Using Flash for speed-sensitive tasks
 # Using Pro for complex analysis
-flash_model = genai.GenerativeModel('gemini-2.5-flash') 
-pro_model = genai.GenerativeModel('gemini-2.5-pro') 
+flash_model = GenerativeModel('gemini-1.5-flash') 
+pro_model = GenerativeModel('gemini-1.5-pro') 
 
 # --- Move Sanitizer Tool ---
 def call_move_sanitizer_tool(malformed_move, legal_moves_str):

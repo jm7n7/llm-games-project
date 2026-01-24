@@ -1,6 +1,6 @@
 flask
 flask-session
-google-generativeai
+google-cloud-aiplatform
 gunicorn
 python-dotenv
 chess
