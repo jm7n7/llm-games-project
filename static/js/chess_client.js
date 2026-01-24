@@ -39,6 +39,14 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.addEventListener('click', (e) => handlePromotionSelection(e.target.dataset.piece));
     });
 
+    // Close AI Reasoning
+    const closeReasoningBtn = document.getElementById('close-reasoning-btn');
+    if (closeReasoningBtn) {
+        closeReasoningBtn.addEventListener('click', () => {
+            aiReasoningModal.classList.add('hidden');
+        });
+    }
+
     // --- Functions ---
 
     function initBoard() {
@@ -352,25 +360,23 @@ document.addEventListener('DOMContentLoaded', () => {
     async function makeMove(start, end) {
         try {
             // 1. Optimistic UI Update
-            // Move piece visually immediately to feel responsive
             const startSq = getSquareByLogicalCoords(start[0], start[1]);
             const endSq = getSquareByLogicalCoords(end[0], end[1]);
             const piece = startSq.querySelector('.piece');
 
             if (piece && endSq) {
-                // Remove any captured piece visually
                 const captured = endSq.querySelector('.piece');
                 if (captured) captured.remove();
-
-                // Move the piece
                 endSq.appendChild(piece);
-
-                // Play sound? (Optional)
             }
 
             // Show "Thinking" status
             statusElement.innerText = "AI is thinking... 🤖";
-            statusElement.classList.add('pulse'); // You might need to add this class in CSS or just use text
+            statusElement.classList.add('pulse');
+
+            // Show AI Reasoning Modal (Thinking state)
+            aiReasoningModal.classList.remove('hidden');
+            aiReasoningText.innerText = "Thinking...";
 
             const response = await fetch('/api/process_move', {
                 method: 'POST',
@@ -384,11 +390,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (data.status === 'success') {
                 // Move Valid
-                fetchGameState(); // Sync truth (will correct any visual glitches)
+                fetchGameState();
 
                 const feedback = data.coach_feedback;
                 if (feedback && feedback.message) {
                     addMessage(feedback.message, 'coach');
+                }
+
+                // Update Reasoning Text
+                if (data.ai_reasoning) {
+                    aiReasoningText.innerText = `"${data.ai_reasoning}"`;
+                } else {
+                    aiReasoningText.innerText = "Calculated best response.";
                 }
 
                 if (feedback.type === 'intervention') {
@@ -396,22 +409,20 @@ document.addEventListener('DOMContentLoaded', () => {
                     showInterventionModal(feedback.message);
                 } else if (data.ai_move) {
                     // --- NO INTERVENTION ---
-                    // Show "AI Moving..." status
                     statusElement.innerText = "AI Moving...";
-
                     setTimeout(() => {
                         executeAIMove();
                     }, 800);
                 }
             } else {
                 console.warn("Invalid move:", data.message);
-                // Revert UI by re-fetching state
                 fetchGameState();
                 statusElement.innerText = "Invalid Move";
+                aiReasoningModal.classList.add('hidden'); // Hide if invalid
             }
         } catch (error) {
             console.error("Error making move:", error);
-            fetchGameState(); // Revert on error
+            fetchGameState();
         }
     }
 
