@@ -188,90 +188,24 @@ def process_move():
             "status": "success",
             "fen": game._get_board_state_string(),
             "game_over": game.game_over,
-            "coach_feedback": {"type": "silent", "message": None},
-            "ai_move": None,
-            "ai_reasoning": "",
-            "status_message": game.status_message,
-             # Pass username in process_move response too?
-             # Actually process_move relies on 'status' logic usually.
-             # But status_message is updated.
+            "status_message": game.status_message, 
         })
 
-    # --- 3. Parallel Execution (Coach & Opponent) ---
-    coach_feedback = {"response_type": "silent", "message": None}
-    ai_move_packet = None
-    ai_reasoning = ""
+    # --- 3. Save Context for AI/Coach ---
+    # We delay the extensive calculation to the /api/ai_turn endpoint
+    # to allow the frontend to update the board (and check status) immediately.
     
-    user_skill = session.get('user_skill_level', 'beginner')
-    player_color = session.get('player_color', 'white')
+    session['last_move_data'] = last_move_data
+    session['dangers_before'] = dangers_before
+    session['options_before'] = options_before
+    session['game_just_moved'] = True # Flag to tell ai_turn this is a response
 
-    with ThreadPoolExecutor() as executor:
-        # Task A: Coach Agent
-        # Analyzes the move just made, using the "before" context.
-        future_coach = executor.submit(
-            coach_agent.get_coaching_packet,
-            last_move_data,
-            json.dumps(dangers_before),
-            json.dumps(options_before),
-            user_skill,
-            player_color,
-            session.get('first_name', 'Student')
-        )
-        
-        # Task B: Opponent Agent (AI)
-        # Calculates the response move. only if game is not over.
-        future_ai = None
-        if not game.game_over:
-            # We MUST pass a deepcopy because 'ai_worker' will modify the board 
-            # (simulating moves) and we don't want to corrupt the session game state 
-            # or cause race conditions if we were doing other things.
-            game_copy = copy.deepcopy(game)
-            
-            future_ai = executor.submit(
-                ai_worker,
-                game_copy,
-                user_skill
-            )
-            
-        # Wait for results (Coach)
-        try:
-            coach_feedback = future_coach.result(timeout=15)
-        except Exception as e:
-            logger.error(f"Coach failed: {e}")
-            coach_feedback = {"response_type": "silent", "message": None}
-            
-        # Wait for results (AI)
-        if future_ai:
-            try:
-                ai_packet = future_ai.result(timeout=30) # AI might take longer
-                if ai_packet:
-                    ai_move_packet = ai_packet.get("move")
-                    ai_reasoning = ai_packet.get("reasoning")
-            except Exception as e:
-                logger.error(f"AI failed: {e}")
-
-    # --- 4. Handle Results ---
-    
-    # Store AI move in session for confirmation step
-    session['pending_ai_move'] = ai_move_packet
-    session['pending_ai_reasoning'] = ai_reasoning
-    session['chess_game'] = game # Save state
-    
-    # Simplified feedback/intervention logic
-    # The frontend expects {status, coach_feedback, ai_move, ...}
-    
     return jsonify({
         "status": "success",
         "fen": game._get_board_state_string(),
         "game_over": game.game_over,
-        "coach_feedback": {
-            "type": coach_feedback.get("response_type", "silent"),
-            "message": coach_feedback.get("message")
-        },
-        # If the coach intervenes ("blunder"), we do NOT show/execute the AI move yet.
-        # The frontend will show the intervention modal.
-        "ai_move": ai_move_packet if coach_feedback.get("response_type") != "intervention" else None,
-        "ai_reasoning": ai_reasoning
+        "in_check": game.is_in_check(game.turn),
+        "status_message": game.status_message,
     })
 
 @app.route('/api/confirm_ai_move', methods=['POST'])
@@ -463,32 +397,84 @@ def promote_pawn():
 
 @app.route('/api/ai_turn', methods=['POST'])
 def ai_turn():
-    """Generates an AI move without a preceding human move (e.g., start of game)."""
+    """
+    Generates an AI move AND Coach feedback.
+    Can be called in two contexts:
+    1. Start of game (Black player) -> No previous human move context.
+    2. Response to Human Move -> Uses session context (dangers_before, etc).
+    """
     game = session.get('chess_game')
     if not game:
         return jsonify({"status": "error", "message": "No active game"}), 404
     
     user_skill = session.get('user_skill_level', 'beginner')
-    
-    # Run AI
-    game_copy = copy.deepcopy(game)
-    ai_move_packet = ai_worker(game_copy, user_skill)
-    
-    if ai_move_packet:
-        move_uci = ai_move_packet.get('move')
-        reasoning = ai_move_packet.get('reasoning')
-        
-        session['pending_ai_move'] = move_uci
-        session['pending_ai_reasoning'] = reasoning
-        session['chess_game'] = game # Not strictly changed yet but good practice
-        
-        return jsonify({
-            "status": "success",
-            "ai_move": move_uci,
-            "ai_reasoning": reasoning
-        })
-        
-    return jsonify({"status": "error", "message": "AI failed to move"}), 500
+    player_color = session.get('player_color', 'white')
+
+    # Defaults
+    coach_feedback = {"response_type": "silent", "message": None}
+    ai_move_packet = None
+    ai_reasoning = ""
+
+    with ThreadPoolExecutor() as executor:
+        future_coach = None
+        future_ai = None
+
+        # 1. Run Coach (if this is a response to a human move)
+        if session.get('game_just_moved'):
+            last_move_data = session.get('last_move_data')
+            dangers_pos = session.get('dangers_before', [])
+            options_pos = session.get('options_before', {})
+            
+            future_coach = executor.submit(
+                coach_agent.get_coaching_packet,
+                last_move_data,
+                json.dumps(dangers_pos),
+                json.dumps(options_pos),
+                user_skill,
+                player_color,
+                session.get('first_name', 'Student')
+            )
+            # Clear flag so we don't re-coach on reload
+            session['game_just_moved'] = False
+
+        # 2. Run AI (Opponent) - unless game over
+        if not game.game_over:
+            game_copy = copy.deepcopy(game)
+            future_ai = executor.submit(
+                ai_worker,
+                game_copy,
+                user_skill
+            )
+
+        # Retrieve Coach Result
+        if future_coach:
+            try:
+                coach_feedback = future_coach.result(timeout=15)
+            except Exception as e:
+                logger.error(f"Coach failed: {e}")
+
+        # Retrieve AI Result
+        if future_ai:
+             try:
+                ai_packet = future_ai.result(timeout=30)
+                if ai_packet:
+                    ai_move_packet = ai_packet.get("move")
+                    ai_reasoning = ai_packet.get("reasoning")
+             except Exception as e:
+                logger.error(f"AI failed: {e}")
+
+    # Save AI move for confirmation step
+    session['pending_ai_move'] = ai_move_packet
+    session['pending_ai_reasoning'] = ai_reasoning
+    session['chess_game'] = game
+
+    return jsonify({
+        "status": "success",
+        "coach_feedback": coach_feedback,
+        "ai_move": ai_move_packet,
+        "ai_reasoning": ai_reasoning,
+        "game_over": game.game_over
+    })
 
 @app.route('/api/chat', methods=['POST'])
 def chat():

@@ -410,40 +410,33 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             const data = await response.json();
 
-            // Remove pulse
+            // Remove pulse (initially added for old flow, keep cleanup)
             statusElement.classList.remove('pulse');
 
             if (data.status === 'success') {
-                // Move Valid
+                // 1. UPDATE BOARD IMMEDIATELY (Red highlights appear here!)
                 fetchGameState();
 
-                const feedback = data.coach_feedback;
-                if (feedback && feedback.message) {
-                    addMessage(feedback.message, 'coach');
+                // 2. CHECK FOR PROMOTION OR GAME OVER
+                if (data.status_message && data.status_message.toLowerCase().includes("promotion")) {
+                    // Promotion logic handled by fetchGameState->updateStatus mostly, 
+                    // but let's ensure we wait.
+                    // The backend said "success" but returned promotion status.
+                    return;
                 }
 
-                // Update Reasoning Text
-                if (data.ai_reasoning) {
-                    aiReasoningText.innerText = `"${data.ai_reasoning}"`;
-                } else {
-                    aiReasoningText.innerText = "Calculated best response.";
+                if (data.game_over) {
+                    return; // Stop.
                 }
 
-                if (feedback.type === 'intervention') {
-                    // --- INTERVENTION ---
-                    showInterventionModal(feedback.message);
-                } else if (data.ai_move) {
-                    // --- NO INTERVENTION ---
-                    statusElement.innerText = "AI Moving...";
-                    setTimeout(() => {
-                        executeAIMove();
-                    }, 800);
-                }
+                // 3. TRIGGER AI (Now that board is updated)
+                triggerAIMoveOnly();
+
             } else {
                 console.warn("Invalid move:", data.message);
-                fetchGameState();
+                fetchGameState(); // Revert
                 statusElement.innerText = "Invalid Move";
-                aiReasoningModal.classList.add('hidden'); // Hide if invalid
+                aiReasoningModal.classList.add('hidden');
             }
         } catch (error) {
             console.error("Error making move:", error);
@@ -473,14 +466,28 @@ document.addEventListener('DOMContentLoaded', () => {
             statusElement.classList.remove('pulse');
 
             if (data.status === 'success') {
-                if (data.ai_reasoning) {
-                    aiReasoningText.innerText = `"${data.ai_reasoning}"`;
+                // Handle Coach Feedback (Now comes from AI Turn)
+                const feedback = data.coach_feedback;
+                if (feedback && feedback.message) {
+                    addMessage(feedback.message, 'coach');
                 }
 
-                statusElement.innerText = "AI Moving...";
-                setTimeout(() => {
-                    executeAIMove();
-                }, 800);
+                if (feedback && feedback.type === 'intervention') {
+                    showInterventionModal(feedback.message);
+                    return; // Stop AI from moving until user decides
+                }
+
+                // Handle AI Move
+                if (data.ai_move) {
+                    if (data.ai_reasoning) {
+                        aiReasoningText.innerText = `"${data.ai_reasoning}"`;
+                    }
+
+                    statusElement.innerText = "AI Moving...";
+                    setTimeout(() => {
+                        executeAIMove();
+                    }, 800);
+                }
             } else {
                 statusElement.innerText = "AI Error";
             }

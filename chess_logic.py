@@ -867,7 +867,7 @@ class ChessGame:
             if isinstance(piece, Pawn) and end_pos[0] in [0, 7]:
                 captured_piece = self.board.get_piece(end_pos)
                 self.promotion_pending = (start_pos, end_pos, captured_piece, piece)
-                self.status_message = f"{self.turn.capitalize()} to promote pawn."
+                self.status_message = f"{self.turn.capitalize()} - Promotion pending."
                 return True, "Promotion" # Special status for UI
             
             # Check for en passant
