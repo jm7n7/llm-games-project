@@ -7,7 +7,7 @@ from google.cloud import storage
 
 logger = logging.getLogger(__name__)
 
-BUCKET_NAME = "user-account-credentials"
+BUCKET_NAME = "user-logins"
 
 def _get_bucket():
     """Returns the GCS bucket object."""
