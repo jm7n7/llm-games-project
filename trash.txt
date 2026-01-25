@@ -1,3 +1,0 @@
-GOOGLE_CLOUD_PROJECT=roochess-ai
-MAIL_USERNAME=roochess.noreply@gmail.com
-MAIL_PASSWORD=abtt pwrg brpr dlmi
