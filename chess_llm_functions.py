@@ -16,8 +16,8 @@ else:
 # --- MODEL INITIALIZATION ---
 # Using Flash for speed-sensitive tasks
 # Using Pro for complex analysis
-FLASH_MODEL_ID = 'gemini-2.0-flash' #setting this because of quota limits
-PRO_MODEL_ID = 'gemini-2.5-flash' #setting this because of quota limits
+FLASH_MODEL_ID = 'gemini-2.0-flash-lite' #setting this because of quota limits
+PRO_MODEL_ID = 'gemini-2.5-flash-lite' #setting this because of quota limits
 
 # --- Move Sanitizer Tool ---
 def call_move_sanitizer_tool(malformed_move, legal_moves_str):
@@ -71,52 +71,36 @@ def call_move_sanitizer_tool(malformed_move, legal_moves_str):
 # We define it here so all opponent tools can share this context.
 CORE_CHESS_DEFINITIONS = """
 **Core Chess Definitions (Your Knowledge Base):**
-
  1. **Piece Values:** Queen=9, Rook=5, Bishop=3, Knight=3, Pawn=1.
-
  2. **"Hanging Piece" (A Blunder):** This is when you make a move and your piece can be captured by an opponent's piece, but you *cannot* recapture it.
     *Example:* Moving your Knight (`f6-e4`) to a square where a Pawn or Knight can capture it, and you have no other piece that can recapture on that *same e4 square*. This is a *bad move* that loses a piece for free.
-
 3. **"Trading Pieces":** This is when you capture a piece with another piece.
     * **"Bad Trade" (A Blunder):** This is when you capture a *low-value* piece (like a Pawn) with a *high-value* piece (like your Queen), and the opponent can then recapture your Queen. You lose a Queen for a Pawn.
     * **"Equal Trade":** This is when two pieces of *equal value* are exchanged (e.g., your Knight captures a Knight, and they recapture). This is neither good nor bad, just a decision.
     * **"Good Trade" (Profit):** This is when you capture a *high-value* piece (like a Rook) with a *low-value* piece (like your Knight), and even if they recapture, you have won material.
-
  4. **"Tempo" (A Key Principle):** This is the concept of developing your pieces.
     * **"Good Tempo":** Moves that develop a *new* piece from your back rank (e.g., `previous_move_count: 0`).
     * **"Bad Tempo" (or "Loss of Tempo"):** Moving a piece that is *already developed* for no good reason (e.g., moving your Knight from f6 to e4 when it doesn't win material).
-
  5. **"Fork" (A Tactic):** When one of your pieces attacks *two or more* opponent pieces at the same time.
-
  6. **"Pin" (A Tactic):** A situation where an attacking piece (like a Bishop) threatens an enemy piece (e.g., a Knight), which cannot move *off the line of attack* without exposing a more valuable piece (e.g., a Queen) or the King behind it. Traditionally, pawns are not included in this definition.
     * **"Absolute Pin":** When the piece behind is the King. Moving the pinned piece *off the line of attack* is illegal.
     * **"Relative Pin":** When the piece behind is a high-value piece (like a Queen). Moving the pinned piece *off the line of attack* can result in a "Blunder" because it results in a "Bad Trade".
     * **"Defended Pin":** When the pinned piece is defended by a friendly piece (e.g., a Knight on e4 defending a Queen on e3). This is not a critical threat, but it is still a tactical situation.
-
  7. **"Castling" (A Special Move):** This is a special move where the King moves two squares toward a Rook, and the Rook moves to the square on the other side of the King.
     * **Why do it?** The two main goals are 1) to move the King to a safer position away from the center of the board, and 2) to develop the Rook (bring it into the game).
-
-8. **"Early Game" (Opening):** This is the beginning of the game.
+ 8. **"Early Game" (Opening):** This is the beginning of the game.
     * **Goals:** The primary goals are to achieve "Good Tempo" by developing your Knights and Bishops, controlling the center of the board (usually e4, d4, e5, d5 squares), and "Castling" to get your King to safety.
-
-9. **"Mid Game":** This phase begins after most pieces are developed.
+ 9. **"Mid Game":** This phase begins after most pieces are developed.
     * **Goals:** The focus shifts to long-term strategy, finding "Good Trades," executing "Tactics" (like "Forks" and "Pins"), and improving your pawn structure.
-
 10. **"End Game":** This phase occurs when most pieces have been traded off the board.
     * **Goals:** The primary goal often becomes promoting a pawn to a Queen. The King, which was kept safe in the Mid Game, now becomes a powerful attacking piece.
-
 11. **"Skewer" (A Tactic):** The opposite of a "Pin." This is when an attacking piece (like a Rook) threatens a *high-value* enemy piece (like a Queen). If the Queen moves to safety, a *lower-value* piece that was *behind* it on the same line (like a Bishop) is now exposed and can be captured.
-
 12. **"Discovered Attack" (A Tactic):** A threat created by moving one piece, which *un-blocks* an attack from a *second* piece behind it.
     * *Example:* A Bishop on a1 is blocked by your own Knight on c3, which is aimed at the enemy King on g7. When the Knight moves (e.g., to e4), it "discovers" a check from the Bishop. This is a "Discovered Check" and is very powerful because the moving piece (the Knight) is free to capture or attack another piece at the same time.
-
 13. **"King Safety" (A Positional Principle):** The goal of keeping your King shielded from checks and mating threats. "Castling" is the main way to achieve this. This principle means you should be careful about moving the pawns in front of your castled King, as they act as a "pawn shield."
-
 14. **"Passed Pawn" (An End Game Goal):** A pawn that has no enemy pawns in front of it on its own file or on the adjacent files. This pawn is extremely dangerous because its path to promotion (becoming a Queen) is not blocked by other pawns.
-
 15. **"Doubled Pawns" (A Positional Weakness):** Two friendly pawns on the same file. They are generally considered a weakness because they cannot defend each other and are less mobile.
-
- 16. **"Open File" (A Positional Goal):** A file (a vertical column, e.g., 'a' through 'h') that has no pawns from *either* side on it. Open files are like highways for Rooks and Queens, allowing them to attack deep into the opponent's territory.
+16. **"Open File" (A Positional Goal):** A file (a vertical column, e.g., 'a' through 'h') that has no pawns from *either* side on it. Open files are like highways for Rooks and Queens, allowing them to attack deep into the opponent's territory.
 """
 
 # --- Coach Post-Move Tools ---
