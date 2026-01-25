@@ -6,8 +6,12 @@ from google import genai
 # This is set in app.py or by the environment
 PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT")
 LOCATION = os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1")
+API_KEY = os.environ.get("ROOCHESS_AI_STUDIO_KEY")
 
-client = genai.Client(vertexai=True, project=PROJECT_ID, location=LOCATION)
+if API_KEY:
+    client = genai.Client(api_key=API_KEY)
+else:
+    client = genai.Client(vertexai=True, project=PROJECT_ID, location=LOCATION)
 
 # --- MODEL INITIALIZATION ---
 # Using Flash for speed-sensitive tasks
