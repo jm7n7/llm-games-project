@@ -16,8 +16,8 @@ else:
 # --- MODEL INITIALIZATION ---
 # Using Flash for speed-sensitive tasks
 # Using Pro for complex analysis
-FLASH_MODEL_ID = 'gemini-2.5-flash'
-PRO_MODEL_ID = 'gemini-2.5-pro' 
+FLASH_MODEL_ID = 'gemini-2.0-flash' #setting this because of quota limits
+PRO_MODEL_ID = 'gemini-2.5-flash' #setting this because of quota limits
 
 # --- Move Sanitizer Tool ---
 def call_move_sanitizer_tool(malformed_move, legal_moves_str):
