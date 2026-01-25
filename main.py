@@ -100,6 +100,14 @@ def new_game():
     # but the frontend seems to manage chat display. 
     # The Coach agent is stateless per request mostly (except for Q&A context).
     session['chat_context'] = [] 
+    
+    # Clear AI/Coach context from previous games to prevent "phantom" interventions
+    session.pop('game_just_moved', None)
+    session.pop('last_move_data', None)
+    session.pop('dangers_before', None)
+    session.pop('options_before', None)
+    session.pop('pending_ai_move', None)
+    session.pop('pending_ai_reasoning', None) 
 
     return jsonify({
         "status": "success", 
@@ -503,6 +511,23 @@ def chat():
     response_text = response_packet.get("commentary", "I'm thinking...")
     
     return jsonify({"status": "success", "response": response_text})
+
+@app.route('/api/analyze_game', methods=['POST'])
+def analyze_game():
+    """Generates a post-game summary."""
+    game = session.get('chess_game')
+    if not game:
+        return jsonify({"status": "error", "message": "No active game"}), 404
+        
+    player_color = session.get('player_color', 'white')
+    
+    # We pass the full game history data
+    summary_packet = coach_agent.get_post_game_summary(json.dumps(game.game_data), player_color)
+    
+    return jsonify({
+        "status": "success", 
+        "analysis": summary_packet
+    })
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080, debug=True)

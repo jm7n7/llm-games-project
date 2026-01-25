@@ -47,6 +47,43 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // --- Analysis Logic ---
+    const analyzeBtn = document.getElementById('modal-analyze-btn');
+    const analysisModal = document.getElementById('analysis-modal');
+    const analysisContent = document.getElementById('analysis-content');
+    const closeAnalysisBtn = document.getElementById('close-analysis-btn');
+
+    if (analyzeBtn) {
+        analyzeBtn.addEventListener('click', async () => {
+            analyzeBtn.innerText = "Analyzing... 🕒";
+            analyzeBtn.disabled = true;
+
+            try {
+                const response = await fetch('/api/analyze_game', { method: 'POST' });
+                const data = await response.json();
+
+                if (data.status === 'success' && data.analysis) {
+                    analysisContent.innerText = data.analysis.message || JSON.stringify(data.analysis, null, 2);
+                    analysisModal.classList.remove('hidden');
+                } else {
+                    alert("Could not generate analysis. Try again!");
+                }
+            } catch (error) {
+                console.error("Analysis error:", error);
+                alert("Error connecting to Coach Joey.");
+            } finally {
+                analyzeBtn.innerText = "Analyze Game 🧠";
+                analyzeBtn.disabled = false;
+            }
+        });
+    }
+
+    if (closeAnalysisBtn) {
+        closeAnalysisBtn.addEventListener('click', () => {
+            analysisModal.classList.add('hidden');
+        });
+    }
+
     // --- Functions ---
 
     function initBoard() {
