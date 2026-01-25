@@ -251,12 +251,23 @@ document.addEventListener('DOMContentLoaded', () => {
             }, 500); // 500ms matches CSS transition
         }
 
-        isPlayerTurn = true;
-
         if (data.game_over) {
             isPlayerTurn = false;
             statusElement.innerText = data.status_message; // Show final result
             showGameOver(data);
+            return;
+        }
+
+        // Handle Turn Logic
+        if (isMyTurn) {
+            isPlayerTurn = true;
+        } else {
+            isPlayerTurn = false;
+            // If it is NOT my turn (and game not over), it's AI's turn.
+            // Triggers only if we are not already waiting for AI (handled by UI states usually, but simple check:)
+            if (!statusElement.innerText.includes("Moving")) {
+                triggerAIMoveOnly();
+            }
         }
 
     }
@@ -439,6 +450,36 @@ document.addEventListener('DOMContentLoaded', () => {
         const data = await response.json();
         if (data.status === 'success') {
             fetchGameState();
+        }
+    }
+
+    async function triggerAIMoveOnly() {
+        statusElement.innerText = "AI is thinking... 🤖";
+        statusElement.classList.add('pulse');
+        aiReasoningModal.classList.remove('hidden');
+        aiReasoningText.innerText = "Thinking...";
+
+        try {
+            const response = await fetch('/api/ai_turn', { method: 'POST' });
+            const data = await response.json();
+
+            statusElement.classList.remove('pulse');
+
+            if (data.status === 'success') {
+                if (data.ai_reasoning) {
+                    aiReasoningText.innerText = `"${data.ai_reasoning}"`;
+                }
+
+                statusElement.innerText = "AI Moving...";
+                setTimeout(() => {
+                    executeAIMove();
+                }, 800);
+            } else {
+                statusElement.innerText = "AI Error";
+            }
+        } catch (e) {
+            console.error(e);
+            statusElement.innerText = "Error";
         }
     }
 

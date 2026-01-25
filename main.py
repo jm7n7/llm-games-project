@@ -445,6 +445,35 @@ def promote_pawn():
             "message": message
         })
 
+@app.route('/api/ai_turn', methods=['POST'])
+def ai_turn():
+    """Generates an AI move without a preceding human move (e.g., start of game)."""
+    game = session.get('chess_game')
+    if not game:
+        return jsonify({"status": "error", "message": "No active game"}), 404
+    
+    user_skill = session.get('user_skill_level', 'beginner')
+    
+    # Run AI
+    game_copy = copy.deepcopy(game)
+    ai_move_packet = ai_worker(game_copy, user_skill)
+    
+    if ai_move_packet:
+        move_uci = ai_move_packet.get('move')
+        reasoning = ai_move_packet.get('reasoning')
+        
+        session['pending_ai_move'] = move_uci
+        session['pending_ai_reasoning'] = reasoning
+        session['chess_game'] = game # Not strictly changed yet but good practice
+        
+        return jsonify({
+            "status": "success",
+            "ai_move": move_uci,
+            "ai_reasoning": reasoning
+        })
+        
+    return jsonify({"status": "error", "message": "AI failed to move"}), 500
+
 @app.route('/api/chat', methods=['POST'])
 def chat():
     """Handles Q&A with Coach."""

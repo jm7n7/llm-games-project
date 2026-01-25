@@ -35,7 +35,6 @@ def get_coaching_packet(last_move_data, dangers_before_json, options_before_json
         json.dumps(last_move_data),  # <-- Pass the move data
         dangers_before_json,        # <-- Pass the dangers context
         options_before_json,        # <-- Pass the options context
-        options_before_json,        # <-- Pass the options context
         user_skill_level, 
         player_color,
         player_name
