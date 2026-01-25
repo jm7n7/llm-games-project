@@ -221,6 +221,13 @@ document.addEventListener('DOMContentLoaded', () => {
             newStatusText += " (in check)";
         } else if (data.status_message.toLowerCase().includes("promotion")) {
             newStatusText += " - Promotion Pending";
+
+            // If it's my turn (and I am the one promoting), show modal
+            // Note: In pending state, backend 'turn' is still the player who moved.
+            if (data.turn === playerColor) {
+                const promotionModal = document.getElementById('promotion-modal');
+                if (promotionModal) promotionModal.classList.remove('hidden');
+            }
         }
 
         // Add pipe separator visually

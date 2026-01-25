@@ -181,6 +181,22 @@ def process_move():
     # Get move data for the Coach (the move that was just made)
     last_move_data = game.game_data[-1] if game.game_data else {}
     
+    # If promotion is pending, stop here and let the user promote.
+    # The game state is "paused" waiting for promotion choice.
+    if hasattr(game, 'promotion_pending') and game.promotion_pending:
+        return jsonify({
+            "status": "success",
+            "fen": game._get_board_state_string(),
+            "game_over": game.game_over,
+            "coach_feedback": {"type": "silent", "message": None},
+            "ai_move": None,
+            "ai_reasoning": "",
+            "status_message": game.status_message,
+             # Pass username in process_move response too?
+             # Actually process_move relies on 'status' logic usually.
+             # But status_message is updated.
+        })
+
     # --- 3. Parallel Execution (Coach & Opponent) ---
     coach_feedback = {"response_type": "silent", "message": None}
     ai_move_packet = None
