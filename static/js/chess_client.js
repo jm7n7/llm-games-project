@@ -502,8 +502,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (data.status === 'success') {
                 fetchGameState(); // Update board, AI turn ends, Human turn begins
-                // Clear AI thinking text after move
-                aiReasoningModal.classList.add('hidden');
+                // AI Reasoning Modal persists until user closes it
             } else {
                 console.error("AI Move Failed:", data.message);
                 statusElement.innerText = "AI Error: " + data.message;
