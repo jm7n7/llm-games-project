@@ -199,14 +199,55 @@ def process_move():
             "status_message": game.status_message, 
         })
 
-    # --- 3. Save Context for AI/Coach ---
-    # We delay the extensive calculation to the /api/ai_turn endpoint
-    # to allow the frontend to update the board (and check status) immediately.
+    # --- 3. Run Coach & AI Logic (Consolidated) ---
+    user_skill = session.get('user_skill_level', 'beginner')
+    player_color = session.get('player_color', 'white')
     
-    session['last_move_data'] = last_move_data
-    session['dangers_before'] = dangers_before
-    session['options_before'] = options_before
-    session['game_just_moved'] = True # Flag to tell ai_turn this is a response
+    # Defaults
+    coach_feedback = {"response_type": "silent", "message": None}
+    ai_move_packet = None
+    ai_reasoning = ""
+
+    # Determine if game is over after human move
+    if not game.game_over:
+        with ThreadPoolExecutor() as executor:
+            # A. Coach Analysis (Analyze the move just made)
+            future_coach = executor.submit(
+                coach_agent.get_coaching_packet,
+                last_move_data,
+                json.dumps(dangers_before),
+                json.dumps(options_before),
+                user_skill,
+                player_color,
+                session.get('first_name', 'Student')
+            )
+            
+            # B. AI Opponent (Calculate *next* move)
+            game_copy = copy.deepcopy(game)
+            future_ai = executor.submit(
+                ai_worker,
+                game_copy,
+                user_skill
+            )
+            
+            # Wait for results
+            try:
+                coach_feedback = future_coach.result(timeout=15)
+            except Exception as e:
+                logger.error(f"Coach failed: {e}")
+                
+            try:
+                ai_packet = future_ai.result(timeout=30)
+                if ai_packet:
+                    ai_move_packet = ai_packet.get("move")
+                    ai_reasoning = ai_packet.get("reasoning")
+            except Exception as e:
+                logger.error(f"AI failed: {e}")
+
+    # Save AI move for confirmation step
+    session['pending_ai_move'] = ai_move_packet
+    session['pending_ai_reasoning'] = ai_reasoning
+    session['chess_game'] = game
 
     return jsonify({
         "status": "success",
@@ -214,6 +255,11 @@ def process_move():
         "game_over": game.game_over,
         "in_check": game.is_in_check(game.turn),
         "status_message": game.status_message,
+        # Added fields:
+        "coach_feedback": coach_feedback,
+        "ai_move": ai_move_packet,
+        "ai_reasoning": ai_reasoning,
+        "turn": game.turn
     })
 
 @app.route('/api/confirm_ai_move', methods=['POST'])

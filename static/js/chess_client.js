@@ -308,8 +308,8 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             isPlayerTurn = false;
             // If it is NOT my turn (and game not over), it's AI's turn.
-            // Triggers only if we are not already waiting for AI (handled by UI states usually, but simple check:)
-            if (!statusElement.innerText.includes("Moving")) {
+            // Triggers only if we are not already waiting for AI and NOT currently handling a move
+            if (!statusElement.innerText.includes("Moving") && !handlingMove) {
                 triggerAIMoveOnly();
             }
         }
@@ -419,7 +419,11 @@ document.addEventListener('DOMContentLoaded', () => {
         validMoves = [];
     }
 
+    // Flag to prevent updateStatus from triggering AI while we are processing a move
+    let handlingMove = false;
+
     async function makeMove(start, end) {
+        handlingMove = true;
         try {
             // 1. Optimistic UI Update
             const startSq = getSquareByLogicalCoords(start[0], start[1]);
@@ -433,12 +437,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             // Show "Thinking" status
-            statusElement.innerText = "AI is thinking... 🤖";
+            statusElement.innerText = "Coach is thinking... 🤔";
             statusElement.classList.add('pulse');
-
-            // Show AI Reasoning Modal (Thinking state)
             aiReasoningModal.classList.remove('hidden');
-            aiReasoningText.innerText = "Thinking...";
+            aiReasoningText.innerText = "Analyzing...";
 
             const response = await fetch('/api/process_move', {
                 method: 'POST',
@@ -447,27 +449,36 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             const data = await response.json();
 
-            // Remove pulse (initially added for old flow, keep cleanup)
             statusElement.classList.remove('pulse');
 
             if (data.status === 'success') {
-                // 1. UPDATE BOARD IMMEDIATELY (Red highlights appear here!)
+                // 1. Update Board State (Human Move Confirmed)
                 fetchGameState();
 
-                // 2. CHECK FOR PROMOTION OR GAME OVER
-                if (data.status_message && data.status_message.toLowerCase().includes("promotion")) {
-                    // Promotion logic handled by fetchGameState->updateStatus mostly, 
-                    // but let's ensure we wait.
-                    // The backend said "success" but returned promotion status.
-                    return;
+                // 2. Handle Coach Feedback
+                const feedback = data.coach_feedback;
+                if (feedback && feedback.message) {
+                    addMessage(feedback.message, 'coach');
                 }
 
-                if (data.game_over) {
-                    return; // Stop.
+                // 3. Handle Intervention
+                if (feedback && feedback.type === 'intervention') {
+                    showInterventionModal(feedback.message);
+                    return; // Stop here. Pending AI move is stored in backend.
                 }
 
-                // 3. TRIGGER AI (Now that board is updated)
-                triggerAIMoveOnly();
+                // 4. Handle AI Move (if no intervention)
+                if (data.ai_move) {
+                    if (data.ai_reasoning) {
+                        aiReasoningText.innerText = `"${data.ai_reasoning}"`;
+                    }
+                    statusElement.innerText = "AI Moving...";
+                    // Delay slightly for effect
+                    setTimeout(() => executeAIMove(), 800);
+                } else if (!data.game_over && !data.status_message.includes("Promotion")) {
+                    // Start of game / No AI move returned? (Shouldn't happen in loop)
+                    aiReasoningModal.classList.add('hidden');
+                }
 
             } else {
                 console.warn("Invalid move:", data.message);
@@ -478,6 +489,8 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error("Error making move:", error);
             fetchGameState();
+        } finally {
+            handlingMove = false;
         }
     }
 
@@ -489,10 +502,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (data.status === 'success') {
                 fetchGameState(); // Update board, AI turn ends, Human turn begins
+                // Clear AI thinking text after move
+                aiReasoningModal.classList.add('hidden');
             } else {
                 console.error("AI Move Failed:", data.message);
                 statusElement.innerText = "AI Error: " + data.message;
-                // Do NOT call fetchGameState() here to avoid loop
             }
         } catch (e) {
             console.error("Execute AI Move Network Error:", e);
@@ -500,6 +514,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function triggerAIMoveOnly() {
+        // Only used for Start of Game (Black) or Resuming Unfinished Turn
         statusElement.innerText = "AI is thinking... 🤖";
         statusElement.classList.add('pulse');
         aiReasoningModal.classList.remove('hidden');
@@ -512,27 +527,15 @@ document.addEventListener('DOMContentLoaded', () => {
             statusElement.classList.remove('pulse');
 
             if (data.status === 'success') {
-                // Handle Coach Feedback (Now comes from AI Turn)
-                const feedback = data.coach_feedback;
-                if (feedback && feedback.message) {
-                    addMessage(feedback.message, 'coach');
+                // Handle Coach Feedback (Unlikely here, but possible)
+                if (data.coach_feedback && data.coach_feedback.message) {
+                    addMessage(data.coach_feedback.message, 'coach');
                 }
 
-                if (feedback && feedback.type === 'intervention') {
-                    showInterventionModal(feedback.message);
-                    return; // Stop AI from moving until user decides
-                }
-
-                // Handle AI Move
                 if (data.ai_move) {
-                    if (data.ai_reasoning) {
-                        aiReasoningText.innerText = `"${data.ai_reasoning}"`;
-                    }
-
+                    if (data.ai_reasoning) aiReasoningText.innerText = `"${data.ai_reasoning}"`;
                     statusElement.innerText = "AI Moving...";
-                    setTimeout(() => {
-                        executeAIMove();
-                    }, 800);
+                    setTimeout(() => executeAIMove(), 800);
                 }
             } else {
                 statusElement.innerText = "AI Error";
