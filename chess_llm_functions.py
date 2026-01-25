@@ -1,19 +1,19 @@
 import os
 import json
-import vertexai
-from vertexai.generative_models import GenerativeModel
+from google import genai
 
 # --- API KEY CONFIG ---
 # This is set in app.py or by the environment
 PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT")
 LOCATION = os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1")
-vertexai.init(project=PROJECT_ID, location=LOCATION)
+
+client = genai.Client(vertexai=True, project=PROJECT_ID, location=LOCATION)
 
 # --- MODEL INITIALIZATION ---
 # Using Flash for speed-sensitive tasks
 # Using Pro for complex analysis
-flash_model = GenerativeModel('gemini-2.5-flash') 
-pro_model = GenerativeModel('gemini-2.5-pro') 
+FLASH_MODEL_ID = 'gemini-2.5-flash'
+PRO_MODEL_ID = 'gemini-2.5-pro' 
 
 # --- Move Sanitizer Tool ---
 def call_move_sanitizer_tool(malformed_move, legal_moves_str):
@@ -47,7 +47,7 @@ def call_move_sanitizer_tool(malformed_move, legal_moves_str):
         {{"move": "null"}}
         """
         
-        response = flash_model.generate_content(prompt)
+        response = client.models.generate_content(model=FLASH_MODEL_ID, contents=prompt)
         print(f"--- SANITIZER TOOL (RAW) ---\n{response.text}\n------------------------------")
         
         json_str = response.text.strip().replace("```json", "").replace("```", "").strip()
@@ -292,7 +292,7 @@ def call_triage_analyst_tool(last_move_data_json, dangers_before_json, options_b
         Return *only* the single-line JSON verdict, including your justification.
         """
         
-        response = pro_model.generate_content(prompt)
+        response = client.models.generate_content(model=PRO_MODEL_ID, contents=prompt)
         print(f"--- TRIAGE ANALYST (RAW) ---\n{response.text}\n------------------------------")
         
         json_str = response.text.strip().replace("```json", "").replace("```", "").strip()
@@ -379,7 +379,7 @@ def call_conversational_coach_tool(triage_verdict_json,
         {{"response_type": "praise", "message": "Great find!"}}
         """
         
-        response = flash_model.generate_content(prompt)
+        response = client.models.generate_content(model=FLASH_MODEL_ID, contents=prompt)
         print(f"--- CONVERSATIONALIST (RAW) ---\n{response.text}\n------------------------------")
         
         json_str = response.text.strip().replace("```json", "").replace("```", "").strip()
@@ -436,7 +436,7 @@ def call_qa_router_tool(user_query, game_context_json):
         {{"tool_choice": "explain_concept"}}
         """
         
-        response = flash_model.generate_content(prompt)
+        response = client.models.generate_content(model=FLASH_MODEL_ID, contents=prompt)
         print(f"--- Q&A ROUTER (RAW) ---\n{response.text}\n------------------------------")
         
         json_str = response.text.strip().replace("```json", "").replace("```", "").strip()
@@ -469,7 +469,7 @@ def call_qa_explain_last_move_tool(user_query, game_context_json):
         Return *only* the JSON response.
         {{"commentary": "I moved my knight there because..."}}
         """
-        response = flash_model.generate_content(prompt)
+        response = client.models.generate_content(model=FLASH_MODEL_ID, contents=prompt)
         json_str = response.text.strip().replace("```json", "").replace("```", "").strip()
         return json.loads(json_str)
     except Exception as e:
@@ -508,7 +508,7 @@ def call_qa_analyze_board_tool(user_query, game_context_json):
         Return *only* the JSON response.
         {{"commentary": "That's a great question..."}}
         """
-        response = pro_model.generate_content(prompt) # Use Pro for smart analysis
+        response = client.models.generate_content(model=PRO_MODEL_ID, contents=prompt) # Use Pro for smart analysis
         json_str = response.text.strip().replace("```json", "").replace("```", "").strip()
         return json.loads(json_str)
     except Exception as e:
@@ -538,7 +538,7 @@ def call_qa_explain_concept_tool(user_query, game_context_json):
         Return *only* the JSON response.
         {{"commentary": "A 'pin' is when..."}}
         """
-        response = flash_model.generate_content(prompt)
+        response = client.models.generate_content(model=FLASH_MODEL_ID, contents=prompt)
         json_str = response.text.strip().replace("```json", "").replace("```", "").strip()
         return json.loads(json_str)
     except Exception as e:
@@ -563,7 +563,7 @@ def call_qa_chit_chat_tool(user_query, game_context_json):
         Return *only* the JSON response.
         {{"commentary": "You've got this!"}}
         """
-        response = flash_model.generate_content(prompt)
+        response = client.models.generate_content(model=FLASH_MODEL_ID, contents=prompt)
         json_str = response.text.strip().replace("```json", "").replace("```", "").strip()
         return json.loads(json_str)
     except Exception as e:
@@ -599,7 +599,7 @@ def call_post_game_analyst_tool(game_data_json, player_color):
         {{"message": "Here's a summary of your game:\\n1. Your opening was strong...\\n2. The turning point was on move 15 when...\\n3. Great find on move 22!..."}}
         """
         
-        response = pro_model.generate_content(prompt) # Use Pro for a better summary
+        response = client.models.generate_content(model=PRO_MODEL_ID, contents=prompt) # Use Pro for a better summary
         print(f"--- POST-GAME TOOL (RAW) ---\n{response.text}\n------------------------------")
         
         json_str = response.text.strip().replace("```json", "").replace("```", "").strip()
@@ -682,7 +682,7 @@ def call_opponent_router_agent(enhanced_moves_json, tactical_threats_json, user_
         {{"tool_choice": "human", "reasoning": "User is intermediate and the board is quiet, so a solid 'human' move is appropriate."}}
         """
         
-        response = flash_model.generate_content(prompt) # Use fast model
+        response = client.models.generate_content(model=FLASH_MODEL_ID, contents=prompt) # Use fast model
         print(f"--- ROUTER AGENT (RAW) ---\n{response.text}\n------------------------------")
         
         json_str = response.text.strip().replace("```json", "").replace("```", "").strip()
@@ -762,7 +762,7 @@ def call_best_move_tool(enhanced_legal_moves_json, tactical_threats_json):
         {{"move": "Qe5-e6", "reasoning": "My Knight on c3 was attacked, but the TACTICAL_THREATS_LIST correctly identified it as a pin to my Queen. Moving the Knight would be a 'Blunder'. I am moving my Queen to e6, which breaks the pin safely."}}
         """
         
-        response = pro_model.generate_content(prompt) # Use Pro for best move
+        response = client.models.generate_content(model=PRO_MODEL_ID, contents=prompt) # Use Pro for best move
         print(f"--- BEST MOVE TOOL (RAW) ---\n{response.text}\n------------------------------")
         
         json_str = response.text.strip().replace("```json", "").replace("```", "").strip()
@@ -825,7 +825,7 @@ def call_human_like_move_tool(enhanced_legal_moves_json, tactical_threats_json):
         {{"move": "Qd4-c5", "reasoning": "My Queen was attacked by a pawn! That would be a 'Hanging Piece' blunder. I moved it to c5, which looks like a safe square."}}
         """
         
-        response = flash_model.generate_content(prompt) # Use Flash
+        response = client.models.generate_content(model=FLASH_MODEL_ID, contents=prompt) # Use Flash
         print(f"--- HUMAN MOVE TOOL (RAW) ---\n{response.text}\n------------------------------")
         
         json_str = response.text.strip().replace("```json", "").replace("```", "").strip()
@@ -897,7 +897,7 @@ def call_teaching_blunder_tool(enhanced_legal_moves_json, tactical_threats_json)
         {{"move": "b2-b3", "reasoning": "Just developing my pawn. (I didn't see that my Queen on d4 was under attack!)"}}
         """
         
-        response = flash_model.generate_content(prompt) # Use Flash
+        response = client.models.generate_content(model=FLASH_MODEL_ID, contents=prompt) # Use Flash
         print(f"--- BLUNDER TOOL (RAW) ---\n{response.text}\n------------------------------")
         
         json_str = response.text.strip().replace("```json", "").replace("```", "").strip()
