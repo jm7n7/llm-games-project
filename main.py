@@ -225,35 +225,50 @@ def confirm_ai_move():
     if not game or not ai_move_uci:
         return jsonify({"status": "error", "message": "No pending AI move"}), 400
         
-    # Helper to convert UCI-like "e2-e4" to coords
+    # Helper to convert UCI-like "e2-e4" or "e2e4" to coords
     def notation_to_coords(notation_str):
-        if '-' not in notation_str: return None, None
-        start_str, end_str = notation_str.split('-')
+        notation_str = notation_str.replace(" ", "").replace("-", "")
+        if len(notation_str) != 4:
+            return None, None
+            
+        start_str = notation_str[:2]
+        end_str = notation_str[2:]
         
         def parse(sq):
             files = 'abcdefgh'
-            c = files.index(sq[0])
-            r = 8 - int(sq[1])
-            return (r, c)
+            try:
+                c = files.index(sq[0])
+                r = 8 - int(sq[1])
+                return (r, c)
+            except (ValueError, IndexError):
+                return None
             
         return parse(start_str), parse(end_str)
         
     start, end = notation_to_coords(ai_move_uci)
+    logger.info(f"CONFIRM AI MOVE: Raw='{ai_move_uci}', Parsed Start={start}, End={end}")
+
     if start and end:
         success, msg = game.make_move(start, end)
+        logger.info(f"MAKE MOVE RESULT: Success={success}, Msg='{msg}'")
         
-        # Auto-promote (simplified for AI)
-        if game.promotion_pending:
-            game.promote_pawn("Queen") 
-    
-    session['pending_ai_move'] = None # Clear
-    session['chess_game'] = game
-    
-    return jsonify({
-        "status": "success", 
-        "move": ai_move_uci,
-        "fen": game._get_board_state_string()
-    })
+        if success:
+             # Auto-promote (simplified for AI)
+            if game.promotion_pending:
+                game.promote_pawn("Queen") 
+                
+            session['pending_ai_move'] = None # Clear
+            session['chess_game'] = game # Save state
+            
+            return jsonify({
+                "status": "success", 
+                "move": ai_move_uci,
+                "fen": game._get_board_state_string()
+            })
+        else:
+            return jsonify({"status": "error", "message": f"Illegal move: {msg}"}), 400
+
+    return jsonify({"status": "error", "message": "Invalid coordinates format"}), 400
 
 @app.route('/api/undo_move', methods=['POST'])
 def undo_move():

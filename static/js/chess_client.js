@@ -483,10 +483,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function executeAIMove() {
         // Calls the endpoint to APPLY the pending AI move
-        const response = await fetch('/api/confirm_ai_move', { method: 'POST' });
-        const data = await response.json();
-        if (data.status === 'success') {
-            fetchGameState();
+        try {
+            const response = await fetch('/api/confirm_ai_move', { method: 'POST' });
+            const data = await response.json();
+
+            if (data.status === 'success') {
+                fetchGameState(); // Update board, AI turn ends, Human turn begins
+            } else {
+                console.error("AI Move Failed:", data.message);
+                statusElement.innerText = "AI Error: " + data.message;
+                // Do NOT call fetchGameState() here to avoid loop
+            }
+        } catch (e) {
+            console.error("Execute AI Move Network Error:", e);
         }
     }
 
