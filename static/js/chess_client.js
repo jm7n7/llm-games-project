@@ -153,6 +153,13 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.status === 'success') {
                 gameOverModal.classList.add('hidden');
                 aiReasoningModal.classList.add('hidden'); // Reset AI dialog
+
+                // Clear Chat Logic
+                if (chatHistory) {
+                    chatHistory.innerHTML = '';
+                    addMessage("Welcome to RooChess! Start a new game to begin.", 'coach');
+                }
+
                 // Clear board locally to force re-render with correct rotation if changed
                 initBoard();
                 fetchGameState();
